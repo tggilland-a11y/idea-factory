@@ -174,11 +174,24 @@ function readAll() {
     if (!n.endsWith(".json")) continue;
     try {
       const rec = JSON.parse(fs.readFileSync(path.join(SUB_DIR, n), "utf8"));
-      if (rec && rec.submitter && Array.isArray(rec.ideas)) out.push(rec);
+      if (rec && rec.submitter && Array.isArray(rec.ideas)) {
+        rec.file = n;   // lets the board name a record when the owner removes it
+        out.push(rec);
+      }
     } catch (e) { /* skip anything unreadable rather than failing the whole read */ }
   }
   out.sort((a, b) => String(a.submittedAt).localeCompare(String(b.submittedAt)));
   return out;
+}
+
+function deleteSubmission(name) {
+  // Owner-only cleanup (test entries, duplicates). The basename is checked
+  // strictly so nothing outside the submissions folder can ever be named.
+  if (!/^[a-z0-9][a-z0-9_.-]*\.json$/i.test(name) || name.includes("..")) return "bad_name";
+  const file = path.join(SUB_DIR, name);
+  if (!file.startsWith(SUB_DIR)) return "bad_name";
+  try { fs.unlinkSync(file); return "ok"; }
+  catch (e) { return e.code === "ENOENT" ? "not_found" : "error"; }
 }
 
 /* ---------------- static ---------------- */
@@ -259,6 +272,21 @@ const server = http.createServer(async (req, res) => {
         return json(res, 401, { error: "Sign in to the board first." });
       }
       return json(res, 200, { schema: "dragoneer.idea-factory.session/v1", submissions: readAll() });
+    }
+
+    if (req.method === "DELETE" && p === "/api/submissions") {
+      if (!tokenValid(cookieOf(req, "dgnr_board"))) {
+        return json(res, 401, { error: "Sign in to the board first." });
+      }
+      const name = url.searchParams.get("file") || "";
+      const r = deleteSubmission(name);
+      if (r === "ok") {
+        console.log(new Date().toISOString(), "deleted", name);
+        return json(res, 200, { ok: true });
+      }
+      if (r === "not_found") return json(res, 404, { error: "That submission is already gone." });
+      if (r === "bad_name") return json(res, 400, { error: "Not a submission file." });
+      return json(res, 500, { error: "Could not delete it." });
     }
 
     if (req.method === "GET" && (p === "/" || p === "/submit")) {

@@ -664,11 +664,13 @@
         return r.json().then(function (b) {
           var list = (b && b.submissions) || [];
           var loaded = 0, bad = 0;
+          var fresh = [];
           list.forEach(function (rec) {
             var v = validate(rec, "collector");
             if (v.error) { bad++; return; }
-            upsert(v.rec); loaded++;
+            fresh.push(v.rec); loaded++;
           });
+          files = fresh;
           persist(); render(); archiveAll().then(arcStatus);
           setSync(loaded
             ? loaded + (loaded === 1 ? " submission" : " submissions") + " live from the collector" +
@@ -852,6 +854,7 @@
     return { rec: {
       id: String(rec.submitter).trim().toLowerCase() + "|" + String(rec.submittedAt || ""),
       filename: fname,
+      file: typeof rec.file === "string" ? rec.file : "",
       submitter: String(rec.submitter).trim(),
       session: String(rec.session || "").trim(),
       submittedAt: String(rec.submittedAt || ""),
@@ -1047,6 +1050,27 @@
       meta.textContent = f.ideas.length + (f.ideas.length === 1 ? " idea" : " ideas") +
         (f.submittedAt ? " · " + f.submittedAt.slice(0, 10) : "");
       li.appendChild(who); li.appendChild(meta);
+      if (f.file) {
+        var rm = document.createElement("button");
+        rm.type = "button"; rm.className = "btn btn-ghost btn-sm";
+        rm.style.marginLeft = "auto";
+        rm.textContent = "Remove";
+        rm.setAttribute("aria-label", "Remove " + f.submitter + "'s submission of " +
+          f.ideas.length + (f.ideas.length === 1 ? " idea" : " ideas"));
+        rm.addEventListener("click", function () {
+          if (!window.confirm("Remove " + f.submitter + "'s submission (" + f.ideas.length +
+              (f.ideas.length === 1 ? " idea" : " ideas") + ") from the record? This cannot be undone.")) return;
+          fetch("api/submissions?file=" + encodeURIComponent(f.file), {
+            method: "DELETE", credentials: "same-origin"
+          }).then(function (r) {
+            if (r.ok) { syncFromServer({}); return; }
+            return r.json().then(function (b) {
+              $("loadErr").textContent = (b && b.error) || "Could not remove it.";
+            }, function () { $("loadErr").textContent = "Could not remove it."; });
+          }, function () { $("loadErr").textContent = "Could not reach the collector."; });
+        });
+        li.appendChild(rm);
+      }
       ul.appendChild(li);
     });
   }
