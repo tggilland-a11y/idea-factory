@@ -181,6 +181,11 @@
   .filelist .sp { margin-left: auto; }
   .loaderr { color: var(--danger); font-size: 13.5px; margin-top: 12px; }
 
+  /* ---------- all-submissions table ---------- */
+  .allrows td { font-size: 13px; min-width: 130px; max-width: 300px; }
+  .allrows td.nowrap, .allrows td.n { min-width: 0; white-space: nowrap; }
+  .allrows strong { font-weight: 700; }
+
   /* ---------- live collector ---------- */
   .livebox { margin-top: 18px; background: var(--panel); border-left: 3px solid var(--brand-blue); padding: 18px 22px 20px; }
   .livebox p { font-size: 14px; color: var(--ink-2); margin: 8px 0 14px; max-width: 78ch; }
@@ -514,6 +519,21 @@
       <div class="tblwrap" id="people"></div>
     </section>
 
+    <!-- every submission, flat -->
+    <section class="block">
+      <div class="block-head">
+        <div>
+          <div class="eyebrow">The raw record</div>
+          <h2>All submissions</h2>
+        </div>
+        <div class="tools">
+          <button class="btn btn-ghost btn-sm" type="button" id="csvBtn">Download for Excel</button>
+        </div>
+      </div>
+      <p class="lede">Every idea from every person, one row each &mdash; the full record behind the charts.</p>
+      <div class="tblwrap allrows" id="allRows"></div>
+    </section>
+
     <!-- dossiers -->
     <section class="block">
       <div class="block-head">
@@ -663,6 +683,11 @@
     $("reloadBtn").addEventListener("click", reloadFromFolder);
     restoreFolder();
     $("syncBtn").addEventListener("click", function () { syncFromServer({}); });
+    $("csvBtn").addEventListener("click", function () {
+      var rows = allRowsData();
+      if (!rows.length) { $("loadErr").textContent = "Nothing to export yet."; return; }
+      saveFile("idea-factory_" + slug(sessionName()) + "_all-submissions.csv", csvOf(rows), function () {});
+    });
     syncFromServer({ quiet: true });
     $("clearBtn").addEventListener("click", function () {
       if (!files.length) return;
@@ -1100,6 +1125,7 @@
     renderRanks(cs);
     renderConsensus(cs);
     renderPeople();
+    renderAllRows();
     renderDossiers(cs);
 
     var merged = cs.filter(function (c) { return c.variants.length; });
@@ -1512,6 +1538,70 @@
     });
     tbl.appendChild(tb);
     host.appendChild(tbl);
+  }
+
+  /* ---------------- all submissions, flat ---------------- */
+  function allRowsData() {
+    var rows = [];
+    files.forEach(function (f) {
+      f.ideas.forEach(function (i) {
+        rows.push({
+          person: f.submitter,
+          when: f.submittedAt ? f.submittedAt.slice(0, 10) : "",
+          company: i.company,
+          excitement: i.excitement,
+          actionability: i.actionability,
+          why: i.why, notes: i.notes, nextSteps: i.nextSteps
+        });
+      });
+    });
+    rows.sort(function (a, b) {
+      return a.person.localeCompare(b.person) || (b.excitement || 0) - (a.excitement || 0);
+    });
+    return rows;
+  }
+
+  function renderAllRows() {
+    var host = $("allRows");
+    host.textContent = "";
+    var rows = allRowsData();
+    if (!rows.length) { host.appendChild(emptyNote("Nothing submitted yet.")); return; }
+    var tbl = document.createElement("table");
+    var th = document.createElement("thead");
+    th.innerHTML = "<tr><th>Person</th><th>Company</th><th class=\"n\">Excite</th><th class=\"n\">Action</th>" +
+      "<th>Why excited</th><th>Also note</th><th>Next steps</th><th>Date</th></tr>";
+    tbl.appendChild(th);
+    var tb = document.createElement("tbody");
+    rows.forEach(function (r) {
+      var tr = document.createElement("tr");
+      var p = td(r.person); p.className = "nowrap"; tr.appendChild(p);
+      var c = document.createElement("td");
+      var st = document.createElement("strong"); st.textContent = r.company;
+      c.appendChild(st); c.className = "nowrap"; tr.appendChild(c);
+      tr.appendChild(td(r.excitement == null ? "—" : r.excitement, "n"));
+      tr.appendChild(td(r.actionability == null ? "—" : r.actionability, "n"));
+      tr.appendChild(td(r.why));
+      tr.appendChild(td(r.notes));
+      tr.appendChild(td(r.nextSteps));
+      var w = td(r.when, "n"); w.className += " nowrap"; tr.appendChild(w);
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+    host.appendChild(tbl);
+  }
+
+  function csvOf(rows) {
+    var esc2 = function (v) {
+      v = String(v == null ? "" : v);
+      return /[",\r\n]/.test(v) ? "\"" + v.replace(/"/g, "\"\"") + "\"" : v;
+    };
+    var head = ["Person", "Company", "Excitement", "Actionability", "Why excited", "Also note", "Next steps", "Date"];
+    var lines = [head.join(",")];
+    rows.forEach(function (r) {
+      lines.push([r.person, r.company, r.excitement, r.actionability, r.why, r.notes, r.nextSteps, r.when]
+        .map(esc2).join(","));
+    });
+    return "﻿" + lines.join("\r\n");   // BOM so Excel reads it as UTF-8
   }
 
   /* ---------------- dossiers ---------------- */
