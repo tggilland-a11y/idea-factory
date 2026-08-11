@@ -153,9 +153,13 @@ function validateSubmission(raw) {
 }
 
 function writeSubmission(rec) {
-  const file = path.join(SUB_DIR, slug(rec.session) + "_" + slug(rec.submitter) + ".json");
-  // Write to a temp file then rename, so a crash mid-write cannot truncate
-  // an existing submission.
+  // Append-only by design: every submission is a new file, nothing is ever
+  // overwritten. People add more ideas by submitting again; nothing they have
+  // already submitted can be edited or replaced from the form.
+  const stamp = rec.submittedAt.replace(/[:.]/g, "-");
+  const file = path.join(SUB_DIR,
+    slug(rec.session) + "_" + slug(rec.submitter) + "_" + stamp + ".json");
+  // Temp file then rename, so a crash mid-write cannot leave a torn record.
   const tmp = file + ".tmp";
   fs.writeFileSync(tmp, JSON.stringify(rec, null, 2), "utf8");
   fs.renameSync(tmp, file);

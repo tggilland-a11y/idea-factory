@@ -436,6 +436,12 @@
 
   var DRAFT_KEY = "dgnr.if.draft.v1";
   var MIN_IDEAS = 3, MAX_IDEAS = 10, SCALE_MAX = 10;
+  var SUBMITTED_KEY = "dgnr.if.submitted.v1";
+  function hasSubmitted() {
+    try { return localStorage.getItem(SUBMITTED_KEY) === "1"; } catch (e) { return false; }
+  }
+  // 3 ideas minimum the first time; adding more later can be any number.
+  function minRequired() { return hasSubmitted() ? 1 : MIN_IDEAS; }
   var DASH = "–", MID = " · ";
 
   var QUESTIONS = [
@@ -548,7 +554,7 @@
       var raw = localStorage.getItem(DRAFT_KEY);
       if (raw) { var d = JSON.parse(raw); if (d && Array.isArray(d.ideas) && d.ideas.length) state = d; }
     } catch (err) {}
-    if (!state.ideas.length) { for (var i = 0; i < MIN_IDEAS; i++) state.ideas.push(blankIdea()); }
+    if (!state.ideas.length) { for (var i = 0; i < minRequired(); i++) state.ideas.push(blankIdea()); }
     if (!state.session) state.session = defaultSession();
 
     $("whoName").textContent = state.submitter || "";
@@ -778,17 +784,21 @@
     var n = state.ideas.length, done = state.ideas.filter(complete).length;
     $("tallyCount").textContent = done + " of " + n + " ideas complete";
     var st = $("tallyState");
-    if (done < MIN_IDEAS) {
-      var need = MIN_IDEAS - done;
-      st.textContent = need + " more complete " + (need === 1 ? "idea" : "ideas") +
-        " to reach the minimum of " + MIN_IDEAS + ".";
+    if (done < minRequired()) {
+      var need = minRequired() - done;
+      st.textContent = minRequired() === 1
+        ? "Complete your idea to submit."
+        : need + " more complete " + (need === 1 ? "idea" : "ideas") +
+          " to reach the minimum of " + minRequired() + ".";
       st.dataset.tone = "warn";
     } else if (done < n) {
       st.textContent = "Ready to submit. " + (n - done) + " " + (n - done === 1 ? "idea is" : "ideas are") +
         " still blank — finish or remove them.";
       st.dataset.tone = "warn";
     } else {
-      st.textContent = "All " + done + " ideas complete. Ready to submit."; st.dataset.tone = "ok";
+      st.textContent = done === 1 ? "Your idea is complete. Ready to submit."
+        : "All " + done + " ideas complete. Ready to submit.";
+      st.dataset.tone = "ok";
     }
     $("addBtn").disabled = n >= MAX_IDEAS;
     $("addHint").textContent = n >= MAX_IDEAS ? "That is the maximum of " + MAX_IDEAS + " ideas."
@@ -828,15 +838,15 @@
     });
 
     var ready = state.ideas.filter(complete);
-    if (ready.length < MIN_IDEAS) problems.push("min");
+    if (ready.length < minRequired()) problems.push("min");
 
     if (problems.length) {
       if (firstBad) firstBad.scrollIntoView({ behavior: "smooth", block: "center" });
       var st = $("tallyState");
       st.dataset.tone = "warn";
       var marked = problems.indexOf("field") !== -1;
-      if (ready.length < MIN_IDEAS) {
-        st.textContent = "Submit at least " + MIN_IDEAS + " complete ideas — " + ready.length + " " +
+      if (ready.length < minRequired()) {
+        st.textContent = "Submit at least " + minRequired() + " complete ideas — " + ready.length + " " +
           (ready.length === 1 ? "is" : "are") + " complete so far." +
           (marked ? " The missing answers are marked in red above." : "");
       } else {
@@ -880,12 +890,18 @@
 
     postSubmission(payload).then(function () {
       panel.dataset.state = "sent";
+      try { localStorage.setItem(SUBMITTED_KEY, "1"); } catch (e) {}
+      state.ideas = [blankIdea()];
+      save();
+      render();
+      $("againBtn").textContent = "Submit more ideas";
       $("stamp").textContent = "Submitted";
       $("receiptHead").textContent = payload.ideas.length +
         (payload.ideas.length === 1 ? " idea submitted" : " ideas submitted");
       $("sentMain").textContent = "Thanks, " + payload.submitter.split(" ")[0] + ". You are done.";
-      $("sentSub").textContent = "Your ideas went straight to the session board. Reopen this page any time " +
-        "before the session to change them and submit again — the newer submission replaces the older one.";
+      $("sentSub").textContent = "Your ideas went straight to the session board and are locked in. " +
+        "Thought of another one? Submit more ideas any time before the session — they are added " +
+        "alongside what you already sent.";
       $("privNote").textContent = "Nothing was saved to this computer beyond a working draft in this browser.";
       $("againBtn").disabled = false;
     })["catch"](function (err) {

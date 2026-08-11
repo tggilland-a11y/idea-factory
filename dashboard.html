@@ -166,19 +166,10 @@
   .lede { color: var(--ink-2); font-size: 14.5px; max-width: 74ch; margin: 8px 0 20px; }
 
   /* ---------- intake ---------- */
-  .drop {
-    border: 1px dashed var(--rule-strong); background: var(--surface);
-    padding: 30px 26px; text-align: center; border-radius: 2px;
-  }
-  .drop[data-hot="1"] { border-color: var(--accent); background: var(--accent-soft); border-style: solid; }
-  .drop h3 { font-family: var(--f-display); font-size: 19px; font-weight: 650; margin: 0 0 6px; letter-spacing: -0.015em; }
-  .drop p { color: var(--ink-2); font-size: 14px; margin: 0 0 18px; }
-  .drop .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   .filelist { list-style: none; margin: 18px 0 0; padding: 0; }
   .filelist li { display: flex; align-items: center; gap: 12px; padding: 11px 2px; border-top: 1px solid var(--rule); font-size: 14px; }
   .filelist .who { font-weight: 600; }
   .filelist .meta { color: var(--ink-3); font-family: var(--f-mono); font-size: 12px; }
-  .filelist .sp { margin-left: auto; }
   .loaderr { color: var(--danger); font-size: 13.5px; margin-top: 12px; }
 
   /* ---------- all-submissions table ---------- */
@@ -190,22 +181,6 @@
   .livebox { margin-top: 18px; background: var(--panel); border-left: 3px solid var(--brand-blue); padding: 18px 22px 20px; }
   .livebox p { font-size: 14px; color: var(--ink-2); margin: 8px 0 14px; max-width: 78ch; }
   .livebox .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-
-  /* ---------- paste from Forms / Excel ---------- */
-  .paste { margin-top: 18px; border: 1px solid var(--rule); background: var(--surface); padding: 20px 22px; }
-  .paste h3 { font-size: 16px; font-weight: 700; margin: 8px 0 6px; }
-  .paste p { font-size: 14px; color: var(--ink-2); margin: 0 0 14px; max-width: 78ch; }
-  .paste textarea {
-    width: 100%; min-height: 96px; font-family: var(--f); font-size: 13px; line-height: 1.45;
-    color: var(--ink); background: var(--plane); border: 1px solid var(--rule-strong);
-    padding: 10px 11px; resize: vertical; white-space: pre; overflow-wrap: normal; overflow-x: auto;
-  }
-  .paste .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
-  .maprep { margin-top: 14px; font-size: 13px; }
-  .maprep table { width: auto; }
-  .maprep td { padding: 3px 18px 3px 0; border: none; font-size: 12.5px; }
-  .maprep td:first-child { color: var(--ink-3); }
-  .maprep .bad { color: var(--danger); }
 
   /* ---------- archive panel ---------- */
   .archive { margin-top: 18px; background: var(--panel); border-left: 3px solid var(--accent); padding: 18px 22px 20px; }
@@ -376,56 +351,26 @@
   <section class="block" id="intake">
     <div class="block-head">
       <div>
-        <div class="eyebrow">Step one</div>
-        <h2>Load the submissions</h2>
+        <div class="eyebrow">The session so far</div>
+        <h2>Who has submitted</h2>
+      </div>
+      <div class="tools">
+        <button class="btn" type="button" id="syncBtn">Refresh</button>
       </div>
     </div>
-    <p class="lede">Drop in the JSON files people sent you. Everything is read in this browser and kept on this
-      device &mdash; no upload, no server. Files stay loaded when you come back.</p>
-    <div class="drop" id="drop">
-      <h3>Drop submission files here</h3>
-      <p>One file per person, named <span class="num">idea-factory_&hellip;.json</span></p>
-      <div class="row">
-        <button class="btn" type="button" id="pickBtn">Choose files</button>
-        <button class="btn btn-ghost" type="button" id="sampleBtn">Load example session</button>
-        <button class="btn btn-ghost" type="button" id="clearBtn">Clear all</button>
-      </div>
-      <input type="file" id="fileInput" accept=".json,application/json" multiple class="sr" />
+    <p class="lede">Everything below arrives on its own when someone presses Submit on the form. Refresh
+      pulls anything new since this page was opened.</p>
+    <div class="livebox">
+      <span class="arcstat" id="syncStat"></span>
     </div>
     <ul class="filelist" id="fileList"></ul>
     <div class="loaderr" id="loadErr" role="alert"></div>
 
-    <div class="livebox">
-      <div class="eyebrow">Live from the collector</div>
-      <p>When the form is hosted alongside this board, submissions arrive here on their own. This checks for
-        anything new.</p>
-      <div class="row">
-        <button class="btn" type="button" id="syncBtn">Refresh submissions</button>
-        <span class="arcstat" id="syncStat"></span>
-      </div>
-    </div>
-
-    <div class="paste">
-      <div class="eyebrow">From a webform or a spreadsheet</div>
-      <h3>Paste responses</h3>
-      <p>If collection runs through a webform, open its response sheet, select everything including the
-        header row, copy, and paste it here. Column names are matched automatically and one row per idea is
-        expected. Comma and tab separated files work too &mdash; drop them above like any other file.</p>
-      <label class="sr" for="pasteBox">Paste response rows</label>
-      <textarea id="pasteBox" spellcheck="false"></textarea>
-      <div class="row">
-        <button class="btn" type="button" id="pasteBtn">Read pasted rows</button>
-        <button class="btn btn-ghost" type="button" id="pasteClear">Clear</button>
-      </div>
-      <div class="maprep" id="mapRep"></div>
-    </div>
-
     <div class="archive">
-      <div class="eyebrow">Where the record lives</div>
-      <p id="arcCopy">Pick a folder on your OneDrive and every submission you load is written into it as a
-        file, straight away. That folder is the permanent record and it is what gets backed up. This browser
-        only keeps a working copy, so clearing site data or moving to another machine loses nothing as long as
-        the folder is set.</p>
+      <div class="eyebrow">A second copy, on your machine</div>
+      <p id="arcCopy">Optional but recommended: pick a folder on your OneDrive and every submission this board
+        sees is also written there as a file. If anything ever happens to the server, Reload from folder
+        rebuilds the whole session from that copy.</p>
       <div class="row">
         <button class="btn" type="button" id="folderBtn">Choose archive folder</button>
         <button class="btn btn-ghost" type="button" id="reloadBtn">Reload from folder</button>
@@ -663,20 +608,6 @@
       if (raw) { var d = JSON.parse(raw); if (Array.isArray(d)) files = d; }
     } catch (e) {}
 
-    var drop = $("drop");
-    ["dragenter", "dragover"].forEach(function (t) {
-      drop.addEventListener(t, function (e) { e.preventDefault(); drop.dataset.hot = "1"; });
-    });
-    ["dragleave", "dragend"].forEach(function (t) {
-      drop.addEventListener(t, function () { drop.dataset.hot = "0"; });
-    });
-    drop.addEventListener("drop", function (e) {
-      e.preventDefault(); drop.dataset.hot = "0";
-      if (e.dataTransfer && e.dataTransfer.files) ingest(e.dataTransfer.files);
-    });
-    $("pickBtn").addEventListener("click", function () { $("fileInput").click(); });
-    $("fileInput").addEventListener("change", function () { ingest(this.files); this.value = ""; });
-    $("sampleBtn").addEventListener("click", loadSample);
     $("folderBtn").addEventListener("click", function () {
       if (pendingHandle) reconnectFolder(); else pickFolder();
     });
@@ -689,11 +620,6 @@
       saveFile("idea-factory_" + slug(sessionName()) + "_all-submissions.csv", csvOf(rows), function () {});
     });
     syncFromServer({ quiet: true });
-    $("clearBtn").addEventListener("click", function () {
-      if (!files.length) return;
-      if (!window.confirm("Remove all " + files.length + " loaded submissions from this browser?")) return;
-      files = []; persist(); render();
-    });
     $("exportBtn").addEventListener("click", exportSession);
     $("thresh").addEventListener("change", function () { cutoff = +this.value; render(); });
     $("rankBy").addEventListener("change", function () { rankBy = this.value; render(); });
@@ -906,41 +832,6 @@
   }
 
   /* ================= ingest ================= */
-  function ingest(fileList) {
-    var arr = Array.prototype.slice.call(fileList);
-    var errs = [], done = 0;
-    $("loadErr").textContent = "";
-    if (!arr.length) return;
-    arr.forEach(function (f) {
-      var r = new FileReader();
-      r.onload = function () {
-        try {
-          var d = JSON.parse(String(r.result));
-          // one person's file, a bare array, or a whole exported session archive
-          var recs = Array.isArray(d) ? d : (Array.isArray(d.submissions) ? d.submissions : [d]);
-          var added = 0;
-          recs.forEach(function (rec) {
-            var v = validate(rec, f.name);
-            if (v.error) { errs.push(f.name + ": " + v.error); return; }
-            upsert(v.rec, f.name); added++;
-          });
-          if (!added && !errs.length) errs.push(f.name + ": no submissions found in this file.");
-        } catch (e) {
-          errs.push(f.name + ": not readable as JSON.");
-        }
-        if (++done === arr.length) finish();
-      };
-      r.onerror = function () { errs.push(f.name + ": could not be read."); if (++done === arr.length) finish(); };
-      r.readAsText(f);
-    });
-    function finish() {
-      persist(); render();
-      archiveAll().then(arcStatus);   // write through to the folder immediately
-      $("loadErr").textContent = errs.length ? errs.join("  ") : "";
-      if (files.length) $("results").scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }
-
   function validate(rec, fname) {
     if (!rec || typeof rec !== "object") return { error: "not a submission." };
     if (!rec.submitter || !String(rec.submitter).trim()) return { error: "no submitter name." };
@@ -959,7 +850,7 @@
     });
     if (!ideas.length) return { error: "no ideas with a company name." };
     return { rec: {
-      id: String(rec.submitter).trim().toLowerCase(),
+      id: String(rec.submitter).trim().toLowerCase() + "|" + String(rec.submittedAt || ""),
       filename: fname,
       submitter: String(rec.submitter).trim(),
       session: String(rec.session || "").trim(),
@@ -974,14 +865,21 @@
   }
 
   function upsert(rec) {
+    // Submissions are append-only: the same submission (same person, same
+    // moment) refreshes in place on a re-sync; a new submission is a new row.
     for (var i = 0; i < files.length; i++) {
-      if (files[i].id === rec.id) {
-        var older = !files[i].submittedAt || (rec.submittedAt && rec.submittedAt >= files[i].submittedAt);
-        if (older) files[i] = rec;
-        return;
-      }
+      if (files[i].id === rec.id) { files[i] = rec; return; }
     }
     files.push(rec);
+  }
+
+  function peopleOf() {
+    var seen = {}, out = [];
+    files.forEach(function (f) {
+      var k = f.submitter.toLowerCase();
+      if (!seen[k]) { seen[k] = true; out.push(f.submitter); }
+    });
+    return out;
   }
 
   function exportSession() {
@@ -1116,8 +1014,8 @@
 
     var cs = ranked();
     var totalIdeas = files.reduce(function (n, f) { return n + f.ideas.length; }, 0);
-    $("sessionLine").textContent = sessionName() + " · " + files.length +
-      (files.length === 1 ? " person" : " people") + " · " + totalIdeas +
+    $("sessionLine").textContent = sessionName() + " · " + peopleOf().length +
+      (peopleOf().length === 1 ? " person" : " people") + " · " + totalIdeas +
       " ideas · " + cs.length + " unique names";
 
     renderTiles(cs, totalIdeas);
@@ -1148,15 +1046,9 @@
       meta.className = "meta";
       meta.textContent = f.ideas.length + (f.ideas.length === 1 ? " idea" : " ideas") +
         (f.submittedAt ? " · " + f.submittedAt.slice(0, 10) : "");
-      var rm = document.createElement("button");
-      rm.type = "button"; rm.className = "btn btn-ghost btn-sm sp";
-      rm.textContent = "Remove";
-      rm.setAttribute("aria-label", "Remove " + f.submitter + "'s submission");
-      rm.addEventListener("click", function () { files.splice(i, 1); persist(); render(); });
-      li.appendChild(who); li.appendChild(meta); li.appendChild(rm);
+      li.appendChild(who); li.appendChild(meta);
       ul.appendChild(li);
     });
-    $("clearBtn").disabled = !files.length;
   }
 
   function renderTiles(cs, totalIdeas) {
@@ -1165,7 +1057,7 @@
     var both = cs.filter(function (c) { return c.avgE >= cutoff && c.avgA >= cutoff; });
     var shared = cs.filter(function (c) { return c.mentions > 1; });
     var t = [
-      { k: "People submitted", v: files.length, n: totalIdeas + " ideas in total" },
+      { k: "People submitted", v: peopleOf().length, n: totalIdeas + " ideas in total" },
       { k: "Unique names", v: cs.length, n: (totalIdeas - cs.length) + " duplicate mentions" },
       { k: "Raised by 2+", v: shared.length, n: shared.length ? shared.slice(0, 3).map(function (c) { return c.name; }).join(", ") : "no overlap yet", tone: "s2" },
       { k: "Excitement " + cutoff + "+", v: hiE.length, n: "of " + cs.length + " names", tone: "s1" },
@@ -1522,7 +1414,14 @@
       "<th class=\"n\">Avg actionability</th><th>Their top name</th></tr>";
     tbl.appendChild(th);
     var tb = document.createElement("tbody");
-    files.slice().sort(function (a, b) { return a.submitter.localeCompare(b.submitter); }).forEach(function (f) {
+    var byPerson = {};
+    files.forEach(function (f) {
+      var k = f.submitter.toLowerCase();
+      if (!byPerson[k]) byPerson[k] = { submitter: f.submitter, ideas: [] };
+      byPerson[k].ideas = byPerson[k].ideas.concat(f.ideas);
+    });
+    Object.keys(byPerson).map(function (k) { return byPerson[k]; })
+      .sort(function (a, b) { return a.submitter.localeCompare(b.submitter); }).forEach(function (f) {
       var es = f.ideas.map(function (i) { return i.excitement; }).filter(function (v) { return v != null; });
       var as = f.ideas.map(function (i) { return i.actionability; }).filter(function (v) { return v != null; });
       var top = f.ideas.slice().sort(function (a, b) {
@@ -1685,11 +1584,11 @@
       s.appendChild(mark);
       s.appendChild(kicker("Private team"));
       s.appendChild(h2("Idea Factory"));
-      s.appendChild(big(sessionName() + ". " + files.length + " " + (files.length === 1 ? "person" : "people") +
+      s.appendChild(big(sessionName() + ". " + peopleOf().length + " " + (peopleOf().length === 1 ? "person" : "people") +
         " put up " + totalIdeas + " ideas covering " + cs.length + " names. " +
         (shared.length ? shared.length + " of them came up more than once." : "Every name came from one person.")));
       var kv = document.createElement("div"); kv.className = "kv";
-      [["People", files.length], ["Ideas", totalIdeas], ["Names", cs.length],
+      [["People", peopleOf().length], ["Ideas", totalIdeas], ["Names", cs.length],
        ["Raised by 2+", shared.length], ["High on both", act.length]].forEach(function (d) {
         var w = document.createElement("div");
         var k = document.createElement("div"); k.className = "k"; k.textContent = d[0];
@@ -1864,110 +1763,5 @@
     else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); go(-1); }
   }
 
-  /* ================= example data ================= */
-  function loadSample() {
-    if (files.length && !window.confirm("Replace the " + files.length + " loaded submissions with the example session?")) return;
-    files = SAMPLE.map(function (r) { return validate(r, "example").rec; });
-    persist(); render();
-    $("loadErr").textContent = "";
-    $("results").scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  var SAMPLE = [
-    { submitter: "Alex Rivera", session: "August 2026", submittedAt: "2026-08-04T15:12:00.000Z", ideas: [
-      { company: "Northwind Logistics", excitement: 9, actionability: 8,
-        why: "Freight brokerage with a real software attach rate — gross margin has gone from 14% to 23% in three years and the take rate is still below the incumbents.",
-        notes: "Founder has turned down two prior processes. Relationship is warm through our Series C in Cargobase.",
-        nextSteps: "Get the CFO on a call this month and ask for the 2026 cohort file." },
-      { company: "Meridian Health Systems", excitement: 8, actionability: 4,
-        why: "Consolidator in outpatient orthopedics with 40% of sites still independent. Same playbook that worked in dental a decade ago.",
-        notes: "Reimbursement risk is the obvious pushback and I do not have a good answer yet.",
-        nextSteps: "Two expert calls on CMS rate direction before we spend more time." },
-      { company: "Verity Data", excitement: 7, actionability: 9,
-        why: "Live process. Data infrastructure for insurance underwriting, 60% net revenue retention expansion, and the sponsor needs an answer by October.",
-        notes: "Price is full at 11x forward revenue. We would be paying for execution.",
-        nextSteps: "Decide in the next two weeks whether we want to be in the second round." },
-      { company: "Halcyon Payments", excitement: 6, actionability: 3,
-        why: "Cross-border payouts for marketplaces. Growing 70% but still small.",
-        notes: "Probably a year early for us.",
-        nextSteps: "Keep the quarterly check-in with the founder." },
-      { company: "Cascade Robotics", excitement: 8, actionability: 5,
-        why: "Warehouse automation that actually sells to the mid-market — $200k ACV instead of $4m, so the sales cycle is nine weeks not nine months.",
-        notes: "Hardware gross margin is the question. Need to see a bill of materials.",
-        nextSteps: "Ask for a site visit at the Reno facility." }
-    ]},
-    { submitter: "Priya Raman", session: "August 2026", submittedAt: "2026-08-05T09:40:00.000Z", ideas: [
-      { company: "Verity Data", excitement: 9, actionability: 9,
-        why: "Best net retention in our whole pipeline and the switching costs are structural — once you are the underwriting system of record you do not get replaced.",
-        notes: "I disagree with the view that the price is full. On 2028 numbers it is 6x.",
-        nextSteps: "I would like to lead this. Give me two weeks to build the model." },
-      { company: "Orchard Software", excitement: 8, actionability: 6,
-        why: "Vertical software for agricultural co-ops, 95% retention, and no venture-funded competitor has bothered to show up.",
-        notes: "Founder-led, no CFO, so diligence will be slow.",
-        nextSteps: "Find a former co-op operator to pressure-test the retention story." },
-      { company: "Northwind Logistics", excitement: 7, actionability: 7,
-        why: "Agree with Alex on the software attach. My addition: the driver app is genuinely good and that is the moat.",
-        notes: "Worth checking how much of the margin gain is mix versus pricing.",
-        nextSteps: "Pull the freight data from our Cargobase relationship for a read on volumes." },
-      { company: "Lumen Bioscience", excitement: 6, actionability: 2,
-        why: "Interesting platform but we would be underwriting science, not a business.",
-        notes: "Including it because someone asked me about it twice this month.",
-        nextSteps: "Pass for now, revisit after their Phase II data." }
-    ]},
-    { submitter: "Daniel Okoye", session: "August 2026", submittedAt: "2026-08-05T18:02:00.000Z", ideas: [
-      { company: "Fairview Insurance Brokers", excitement: 9, actionability: 7,
-        why: "Commercial lines brokerage roll-up with 11 tuck-ins done and a real integration playbook. Organic growth is 9% before any acquisition.",
-        notes: "Two other sponsors are circling. We would need to move fast.",
-        nextSteps: "Call the banker this week and ask what a preemptive number looks like." },
-      { company: "Northwind Logistics", excitement: 8, actionability: 8,
-        why: "Third vote here. The reason I like it: the software revenue is contracted and recurring, so we are buying a services multiple for a software business.",
-        notes: "The concentration in two shippers is the thing that would kill it.",
-        nextSteps: "Get the top-20 customer file and test concentration." },
-      { company: "Atlas Compliance", excitement: 7, actionability: 5,
-        why: "Regulatory workflow for regional banks. Every customer has to buy something like this and most are still on spreadsheets.",
-        notes: "Crowded category, weak differentiation on paper. The pull is the customer love.",
-        nextSteps: "Six customer references before we do anything else." },
-      { company: "Verity Data", excitement: 8, actionability: 9,
-        why: "Live and high quality. I would rather pay up here than chase something cheaper and worse.",
-        notes: "",
-        nextSteps: "Support Priya on the model, take the underwriting call." }
-    ]},
-    { submitter: "Sofia Bianchi", session: "August 2026", submittedAt: "2026-08-06T11:20:00.000Z", ideas: [
-      { company: "Fairview Insurance Brokers", excitement: 8, actionability: 6,
-        why: "The organic growth is what makes this different from every other brokerage roll-up we have seen.",
-        notes: "Leverage is already 4.5x. Any deal needs an equity cure story.",
-        nextSteps: "Model it at 3x leverage and see if the returns still work." },
-      { company: "Kestrel Energy Services", excitement: 7, actionability: 8,
-        why: "Grid maintenance services with a 15-year backlog tailwind from transmission spend. Boring, cash generative, nobody wants it.",
-        notes: "Cyclicality is real but the backlog is contracted.",
-        nextSteps: "Get comfortable with the contract structure — ask for three sample MSAs." },
-      { company: "Orchard Software", excitement: 7, actionability: 5,
-        why: "Second vote. Retention is the story and the market is genuinely unserved.",
-        notes: "Agree with Priya that diligence will be slow without a CFO.",
-        nextSteps: "Introduce them to a CFO candidate — it helps the process either way." },
-      { company: "Bright Harbor Education", excitement: 5, actionability: 3,
-        why: "Growing fast but the unit economics depend on state funding decisions.",
-        notes: "Low conviction. Listing it for completeness.",
-        nextSteps: "No action." }
-    ]},
-    { submitter: "Marcus Chen", session: "August 2026", submittedAt: "2026-08-07T08:05:00.000Z", ideas: [
-      { company: "Cascade Robotics", excitement: 9, actionability: 6,
-        why: "The mid-market wedge Alex mentions is the whole thesis. They have 340 customers and the incumbents have 40 each.",
-        notes: "I have known the CTO for six years. He would take our call tomorrow.",
-        nextSteps: "I will set up dinner with the founders in September." },
-      { company: "Atlas Compliance", excitement: 6, actionability: 7,
-        why: "Process is starting. Decent business, not a special one.",
-        notes: "Would only do this at a price.",
-        nextSteps: "Watch the process, do not lead it." },
-      { company: "Sentinel Cyber", excitement: 8, actionability: 4,
-        why: "Identity security for mid-market, 130% net retention, founder-led sales still working at $60m ARR.",
-        notes: "They have said no to every sponsor for two years running.",
-        nextSteps: "Long-game relationship build — quarterly notes, no pitch." },
-      { company: "Kestrel Energy Services", excitement: 6, actionability: 8,
-        why: "Agree it is available and cash generative. I am less excited than Sofia — the margin profile is thin.",
-        notes: "",
-        nextSteps: "Read the MSAs Sofia pulls and form a view." }
-    ]}
-  ];
 })();
 </script>
