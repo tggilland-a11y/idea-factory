@@ -1,0 +1,12 @@
+{
+  "name": "dragoneer-idea-factory",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monthly idea submission form and session board for the Dragoneer private team.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

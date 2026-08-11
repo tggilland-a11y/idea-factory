@@ -1,0 +1,21 @@
+# Render blueprint: creates the web service with a persistent disk so
+# submissions survive restarts and deploys. Render terminates HTTPS for us.
+services:
+  - type: web
+    name: dragoneer-idea-factory
+    runtime: node
+    plan: starter            # persistent disks are not available on the free plan
+    buildCommand: ""
+    startCommand: node server.js
+    autoDeploy: true
+    disk:
+      name: idea-factory-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+      - key: SESSION_SECRET
+        generateValue: true   # Render generates and stores a strong value
+      - key: SESSION_HOURS
+        value: "12"
