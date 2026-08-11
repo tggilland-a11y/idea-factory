@@ -413,7 +413,7 @@
         </div>
       </div>
       <p class="lede">Top right is where the meeting should spend its time: high conviction and something to act on.
-        Top left is conviction without a path &mdash; that is where next steps matter most.</p>
+        Top left is important but not urgent &mdash; prioritize it, and use next steps to build the path.</p>
       <div class="card">
         <div class="legend" id="scatterLegend"></div>
         <div class="chart-scroll"><div id="scatter"></div></div>
@@ -1126,6 +1126,8 @@
     var cx = X(cutoff - 0.5), cy = Y(cutoff - 0.5);
     svg.appendChild(sv("rect", { x: cx, y: m.t, width: (m.l + iw) - cx, height: cy - m.t,
       fill: "var(--accent)", opacity: "0.055" }));
+    svg.appendChild(sv("rect", { x: m.l, y: m.t, width: cx - m.l, height: cy - m.t,
+      fill: "var(--s3)", opacity: "0.05" }));
     svg.appendChild(sv("line", { x1: cx, y1: m.t, x2: cx, y2: m.t + ih, stroke: "var(--rule-strong)", "stroke-width": "1", "stroke-dasharray": "3 4" }));
     svg.appendChild(sv("line", { x1: m.l, y1: cy, x2: m.l + iw, y2: cy, stroke: "var(--rule-strong)", "stroke-width": "1", "stroke-dasharray": "3 4" }));
 
@@ -1154,7 +1156,7 @@
 
     // quadrant captions
     [["Act now", m.l + iw - 8, m.t + 16, "end"],
-     ["Build the path", m.l + 8, m.t + 16, "start"],
+     ["Important, but not urgent. Prioritize.", m.l + 8, m.t + 16, "start"],
      ["Keep warm", m.l + 8, m.t + ih - 10, "start"],
      ["Available, lower conviction", m.l + iw - 8, m.t + ih - 10, "end"]].forEach(function (q) {
       var t = sv("text", { x: q[1], y: q[2], "text-anchor": q[3], "font-size": "10.5",
@@ -1606,7 +1608,7 @@
       [ "The map — where every name sits on conviction and actionability",
         shared.length ? "Shared names first — " + shared.slice(0, 4).map(function (c) { return c.name; }).join(", ") : "Names with the highest conviction",
         act.length ? "Act now — " + act.length + " " + (act.length === 1 ? "name is" : "names are") + " live and high conviction" : "What could become actionable",
-        conv.length ? "Conviction without a path — " + conv.length + " " + (conv.length === 1 ? "name" : "names") + " needing next steps" : "Where we need more work",
+        conv.length ? "Important, but not urgent — " + conv.length + " " + (conv.length === 1 ? "name" : "names") + " to prioritize" : "Where we need more work",
         "Owners and next steps out of the room" ].forEach(function (t, i) {
         var li = document.createElement("li");
         var n = document.createElement("span"); n.className = "i"; n.textContent = (i + 1 < 10 ? "0" : "") + (i + 1);
