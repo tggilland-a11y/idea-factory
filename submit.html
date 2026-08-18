@@ -7,8 +7,10 @@
      002060 navy, EFECE7 warm panel, breadcrumb / confidential box /
      source line structure carried over from the deck template.
      ============================================================ */
+  /* Committed to a single light rendering on every device, matching the
+     deck. Dark-mode tokens were removed deliberately. */
   :root {
-    color-scheme: light;
+    color-scheme: only light;
     --plane:        #F7F5F2;   /* page ground, warm neutral from the EFECE7 family */
     --surface:      #FFFFFF;   /* deck background */
     --panel:        #EFECE7;   /* DIG commentary tint */
@@ -29,36 +31,6 @@
 
     --f: Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:where(:not([data-theme="light"])) {
-      color-scheme: dark;
-      --plane: #151312; --surface: #1E1B19; --panel: #262220; --sunk: #2A2624;
-      --ink: #EDEAE6; --ink-2: #ADA8A2; --ink-3: #8A857F;
-      --rule: #332E2B; --rule-strong: #46403C;
-      --brand-red: #CE6E5E; --brand-red-dk: #E39184;
-      --brand-blue: #4F8BC7; --brand-navy: #8FB4D9;
-      --red-soft: rgba(206,110,94,0.14);
-      --danger: #E36A6A; --ok: #7BC47F;
-      --shadow: 0 1px 2px rgba(0,0,0,0.4);
-    }
-
-      body { background-image: linear-gradient(168deg, #191615 0%, #141211 52%, #100E0D 100%); }
-      body::before { opacity: 0.085; }
-      body::after { opacity: 0.05; }
-  }
-  }
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --plane: #151312; --surface: #1E1B19; --panel: #262220; --sunk: #2A2624;
-    --ink: #EDEAE6; --ink-2: #ADA8A2; --ink-3: #8A857F;
-    --rule: #332E2B; --rule-strong: #46403C;
-    --brand-red: #CE6E5E; --brand-red-dk: #E39184;
-    --brand-blue: #4F8BC7; --brand-navy: #8FB4D9;
-    --red-soft: rgba(206,110,94,0.14);
-    --danger: #E36A6A; --ok: #7BC47F;
-    --shadow: 0 1px 2px rgba(0,0,0,0.4);
-  }
-
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--plane); color: var(--ink);

@@ -11,8 +11,10 @@
      Light-mode series sit under 3:1 on the surface, so the relief
      rule applies: direct labels + a table view ship with every chart.
      ============================================================ */
+  /* Committed to a single light rendering on every device, matching the
+     deck. Dark-mode tokens were removed deliberately. */
   :root {
-    color-scheme: light;
+    color-scheme: only light;
     --paper:        #F7F5F2;   /* page ground, warm neutral from the EFECE7 family */
     --surface:      #FFFFFF;   /* deck background */
     --panel:        #EFECE7;   /* DIG commentary tint */
@@ -39,38 +41,6 @@
     --f-body:    Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
     --f-mono:    Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:where(:not([data-theme="light"])) {
-      color-scheme: dark;
-      --paper: #151312; --surface: #1E1B19; --panel: #262220; --surface-sunk: #2A2624;
-      --ink: #EDEAE6; --ink-2: #ADA8A2; --ink-3: #8A857F;
-      --rule: #332E2B; --rule-strong: #46403C; --grid: #2A2624;
-      --accent: #CE6E5E; --accent-dk: #E39184; --accent-soft: rgba(206,110,94,0.14);
-      --s2: #CE6E5E; --s2-ink: #E39184;
-      --s1: #4F8BC7; --s1-ink: #6FA8DC;
-      --s3: #8FB4D9; --danger: #E36A6A;
-      --shadow: 0 1px 2px rgba(0,0,0,0.4);
-      --shadow-lg: 0 10px 36px rgba(0,0,0,0.55);
-    }
-
-      body { background-image: linear-gradient(168deg, #191615 0%, #141211 52%, #100E0D 100%); }
-      body::before { opacity: 0.085; }
-      body::after { opacity: 0.05; }
-  }
-  }
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --paper: #151312; --surface: #1E1B19; --panel: #262220; --surface-sunk: #2A2624;
-    --ink: #EDEAE6; --ink-2: #ADA8A2; --ink-3: #8A857F;
-    --rule: #332E2B; --rule-strong: #46403C; --grid: #2A2624;
-    --accent: #CE6E5E; --accent-dk: #E39184; --accent-soft: rgba(206,110,94,0.14);
-    --s2: #CE6E5E; --s2-ink: #E39184;
-    --s1: #4F8BC7; --s1-ink: #6FA8DC;
-    --s3: #8FB4D9; --danger: #E36A6A;
-    --shadow: 0 1px 2px rgba(0,0,0,0.4);
-    --shadow-lg: 0 10px 36px rgba(0,0,0,0.55);
-  }
-
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--paper); color: var(--ink);
@@ -171,6 +141,20 @@
   .filelist .who { font-weight: 600; }
   .filelist .meta { color: var(--ink-3); font-family: var(--f-mono); font-size: 12px; }
   .loaderr { color: var(--danger); font-size: 13.5px; margin-top: 12px; }
+
+  /* ---------- discussion agenda ---------- */
+  .discuss td { vertical-align: top; }
+  .discuss td small { color: var(--ink-3); font-size: 11px; }
+  .discuss .steps-col { min-width: 260px; }
+  .thnote { display: block; font-size: 9.5px; letter-spacing: 0.05em; color: var(--ink-3); text-transform: none; margin-top: 2px; }
+  .discuss .steps {
+    min-width: 260px; cursor: text;
+    background: var(--red-soft);
+    border-left: 2px solid var(--brand-red);
+    padding-left: 10px;
+  }
+  .discuss .steps:empty::before { content: "Click to type…"; color: var(--ink-3); font-style: italic; }
+  .discuss .steps:focus { outline: 2px solid var(--brand-red); outline-offset: -2px; background: var(--surface); }
 
   /* ---------- all-submissions table ---------- */
   .allrows td { font-size: 13px; min-width: 130px; max-width: 300px; }
@@ -400,6 +384,23 @@
       <div class="tiles" id="tiles"></div>
     </section>
 
+    <!-- discussion agenda -->
+    <section class="block">
+      <div class="block-head">
+        <div>
+          <div class="eyebrow">Run the meeting from here</div>
+          <h2>Discussion Agenda</h2>
+        </div>
+        <div class="tools">
+          <button class="btn btn-ghost btn-sm" type="button" id="agendaCsvBtn">Download agenda for Excel</button>
+        </div>
+      </div>
+      <p class="lede">Every name received, ranked by total excitement points across everyone who submitted it.
+        The last column is yours to fill in live as the team agrees next steps &mdash; it saves as you type on
+        this machine and comes out in the download.</p>
+      <div class="tblwrap card" id="agenda"></div>
+    </section>
+
     <!-- scatter -->
     <section class="block">
       <div class="block-head">
@@ -614,6 +615,10 @@
     $("reloadBtn").addEventListener("click", reloadFromFolder);
     restoreFolder();
     $("syncBtn").addEventListener("click", function () { syncFromServer({}); });
+    $("agendaCsvBtn").addEventListener("click", function () {
+      if (!files.length) { $("loadErr").textContent = "Nothing to export yet."; return; }
+      saveFile("idea-factory_" + slug(sessionName()) + "_discussion-agenda.csv", agendaCsv(), function () {});
+    });
     $("csvBtn").addEventListener("click", function () {
       var rows = allRowsData();
       if (!rows.length) { $("loadErr").textContent = "Nothing to export yet."; return; }
@@ -1022,6 +1027,7 @@
       " ideas · " + cs.length + " unique names";
 
     renderTiles(cs, totalIdeas);
+    renderAgenda();
     drawScatter();
     renderRanks(cs);
     renderConsensus(cs);
@@ -1463,6 +1469,96 @@
     });
     tbl.appendChild(tb);
     host.appendChild(tbl);
+  }
+
+  /* ---------------- discussion agenda ---------------- */
+  var AGENDA_KEY = "dgnr.if.agenda.v1";
+
+  function agendaNotes() {
+    try { return JSON.parse(localStorage.getItem(AGENDA_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function saveAgendaNote(companyKey, text) {
+    var all = agendaNotes();
+    all[sessionName() + "|" + companyKey] = text;
+    try { localStorage.setItem(AGENDA_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+  function agendaNoteFor(companyKey) {
+    return agendaNotes()[sessionName() + "|" + companyKey] || "";
+  }
+
+  function agendaData() {
+    return aggregate().map(function (c) {
+      var es = c.entries.map(function (e) { return e.idea.excitement || 0; });
+      return {
+        key: c.key,
+        name: c.name,
+        people: c.people,
+        totalE: es.reduce(function (a, b) { return a + b; }, 0),
+        breakdown: es.length > 1 ? es.join(" + ") : "",
+        avgA: c.avgA,
+        mentions: c.mentions
+      };
+    }).sort(function (a, b) {
+      return b.totalE - a.totalE || b.avgA - a.avgA || a.name.localeCompare(b.name);
+    });
+  }
+
+  function renderAgenda() {
+    var host = $("agenda");
+    host.textContent = "";
+    var rows = agendaData();
+    if (!rows.length) { host.appendChild(emptyNote("Nothing submitted yet.")); return; }
+    var tbl = document.createElement("table");
+    tbl.className = "discuss";
+    var th = document.createElement("thead");
+    th.innerHTML = "<tr><th class=\"n\">#</th><th>Company name</th><th>Recommender</th>" +
+      "<th class=\"n\">Excitement</th><th class=\"n\">Actionability</th>" +
+      "<th class=\"steps-col\">Next steps <span class=\"thnote\">agreed in the meeting — type here</span></th></tr>";
+    tbl.appendChild(th);
+    var tb = document.createElement("tbody");
+    rows.forEach(function (r, i) {
+      var tr = document.createElement("tr");
+      tr.appendChild(td(i + 1, "n"));
+      var nm = document.createElement("td");
+      var st = document.createElement("strong"); st.textContent = r.name;
+      nm.appendChild(st); nm.className = "nowrap";
+      tr.appendChild(nm);
+      tr.appendChild(td(r.people.join(", ")));
+      var ex = document.createElement("td");
+      ex.className = "n";
+      ex.textContent = r.totalE;
+      if (r.breakdown) {
+        var bd = document.createElement("small");
+        bd.textContent = " (" + r.breakdown + ")";
+        ex.appendChild(bd);
+      }
+      tr.appendChild(ex);
+      tr.appendChild(td(r.avgA, "n"));
+      var steps = document.createElement("td");
+      steps.className = "steps";
+      steps.contentEditable = "true";
+      steps.spellcheck = true;
+      steps.setAttribute("aria-label", "Next steps for " + r.name);
+      steps.textContent = agendaNoteFor(r.key);
+      steps.addEventListener("input", function () { saveAgendaNote(r.key, steps.textContent); });
+      tr.appendChild(steps);
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+    host.appendChild(tbl);
+  }
+
+  function agendaCsv() {
+    var lines = [["Rank", "Company name", "Recommender", "Excitement (total)", "Actionability (avg)", "Next steps"]];
+    agendaData().forEach(function (r, i) {
+      lines.push([i + 1, r.name + (r.breakdown ? " (" + r.breakdown + ")" : ""), r.people.join(", "),
+        r.totalE, r.avgA, agendaNoteFor(r.key)]);
+    });
+    var esc2 = function (v) {
+      v = String(v == null ? "" : v);
+      return /[",\r\n]/.test(v) ? "\"" + v.replace(/"/g, "\"\"") + "\"" : v;
+    };
+    return "﻿" + lines.map(function (l) { return l.map(esc2).join(","); }).join("\r\n");
   }
 
   /* ---------------- all submissions, flat ---------------- */
