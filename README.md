@@ -1,14 +1,29 @@
 # Idea Factory
 
-Monthly idea-submission site for the Dragoneer private team, plus the board that
-runs the session.
+Monthly idea-submission site for the Dragoneer private team: a two-part form,
+the team's session board, and a pipeline tracker that is safe to share beyond
+the team.
 
-- `submit.html` — the form. First name and last initial, then 3–10 ideas, six
-  questions each. Pressing Submit files the ideas directly; nothing is saved to
-  the submitter's computer and there is nothing to email.
-- `dashboard.html` — the session board. Passphrase protected. Loads every
-  submission, charts them, and runs the meeting in Present mode.
-- `server.js` — the collector. Zero dependencies, Node built-ins only.
+## The monthly format (since September 2026)
+
+- **Part 1 — pipeline & private opportunities.** Up to 10 names, each with a
+  1–10 excitement score. Biased toward pipeline names in progress; new ideas
+  count. **Shared broadly with colleagues outside the team** via the pipeline
+  tracker.
+- **Part 2 — not a big time bet today.** Up to 5 companies with the full six
+  questions (company, excitement, actionability, why, notes, next steps).
+  Team-only, discussed on the session board.
+
+August 2026 predates the split: those records carry six-question ideas only and
+appear on the board under their own session.
+
+## Pages
+
+| Path | What | Who |
+|---|---|---|
+| `/` | The form. First name + last initial, then Part 1 and Part 2. Submitting files everything directly — nothing is saved to the submitter's computer. Submissions are append-only: no editing after submit, but submitting again adds more. | Anyone with the link |
+| `/board` | Session board for Part 2: agenda ranked by total excitement, conviction/actionability map, per-person views, present mode. One month at a time — a session picker (and `?session=september-2026` links) switches months. | Team (board passphrase) |
+| `/pipeline` | Pipeline tracker for Part 1: this month's ranking by total excitement points and a month-over-month matrix with deltas. Shows names, points, and vote counts — never individual attributions or Part 2 commentary. | Broad (tracker passphrase; the board passphrase works too) |
 
 ## Run it
 
@@ -16,101 +31,70 @@ runs the session.
 node server.js
 ```
 
-Then the form is at `http://localhost:8080/` and the board at
-`http://localhost:8080/board`.
-
-For anything real, set the two environment variables below and put it behind
-HTTPS.
+Zero dependencies, Node built-ins only.
 
 ## Configuration
 
 | Variable | Default | What it does |
 |---|---|---|
 | `PORT` | `8080` | Listening port. |
-| `DATA_DIR` | `./data` | Where submissions are written. **Point this at a synced OneDrive or SharePoint folder** so the firm's normal backup covers the record. |
-| `SESSION_SECRET` | random each start | Signs board sign-in cookies. Set it, or everyone signs in again after a restart. |
-| `PASS_VERIFIER` | current passphrase | PBKDF2-SHA256 verifier for the board passphrase. See below to change it. |
-| `PASS_SALT` | `dgnr-idea-factory-2026` | Salt for the verifier. Change it and the verifier together. |
+| `DATA_DIR` | `./data` | Where submissions are written (point at persistent/backed-up storage). |
+| `SESSION_SECRET` | random each start | Signs sign-in cookies. Set it, or everyone signs in again after a restart. |
+| `PASS_VERIFIER` | current board passphrase | PBKDF2-SHA256 verifier for the board. |
+| `PIPE_VERIFIER` | current tracker passphrase | Verifier for the pipeline tracker's viewer passphrase. |
+| `PASS_SALT` | `dgnr-idea-factory-2026` | Salt for both verifiers. |
 | `PASS_ITERS` | `250000` | PBKDF2 iterations. |
-| `SESSION_HOURS` | `12` | How long a board sign-in lasts. |
+| `SESSION_HOURS` | `12` | How long a sign-in lasts. |
 
-Example on Windows:
+### Changing a passphrase
 
-```bash
-set SESSION_SECRET=some-long-random-string && set DATA_DIR=C:\Users\Taylor\OneDrive - Dragoneer Investment Group\Idea Factory && node server.js
-```
-
-### Changing the board passphrase
-
-The passphrase is never stored, only a verifier. Generate a new one:
+Passphrases are never stored, only verifiers. Generate one:
 
 ```bash
 node -e "const c=require('crypto');c.pbkdf2(process.argv[1],'dgnr-idea-factory-2026',250000,32,'sha256',(e,k)=>console.log(k.toString('hex')))" "your new passphrase"
 ```
 
-Set the output as `PASS_VERIFIER`. It also needs updating inside
-`dashboard.html` (the `VERIFIER` constant) for the offline fallback path.
+Set the output as `PASS_VERIFIER` (board) or `PIPE_VERIFIER` (tracker). The
+board's offline fallback also has a `VERIFIER` constant inside
+`dashboard.html`.
 
 ## Where submissions go
 
-One JSON file per person per session, under `DATA_DIR/submissions`, named
-`<session>_<person>.json`. Plain readable files on purpose — no database to
-maintain or migrate.
-
-Writes go to a temp file and are then renamed, so an interrupted write cannot
-truncate an existing submission. Submitting again replaces that person's file
-rather than adding a duplicate, so people can revise up to the meeting.
-
-The board also has a **Choose archive folder** control that writes a second copy
-wherever you point it. That is belt-and-braces; with `DATA_DIR` on OneDrive the
-server copy is already the durable record.
+One JSON file per submission under `DATA_DIR/submissions`, named
+`<session>_<person>_<timestamp>.json`. Append-only: nothing is ever
+overwritten; the board's owner-only Remove is the single deletion path.
+Writes go to a temp file then rename, so a crash cannot tear a record.
 
 ## API
 
 | Route | Auth | Purpose |
 |---|---|---|
-| `POST /api/submissions` | open | A submission arrives. Validated and size-capped. |
-| `POST /api/auth` | — | Board passphrase in, signed HttpOnly cookie out. |
-| `GET /api/submissions` | cookie | Every submission, for the board. |
+| `POST /api/submissions` | open | A submission arrives (both parts). Validated and size-capped. |
+| `POST /api/auth` | — | Board passphrase → `board`-scoped cookie. |
+| `POST /api/pipe-auth` | — | Tracker (or board) passphrase → `pipe`-scoped cookie. |
+| `GET /api/submissions` | board cookie | Everything, for the board. |
+| `DELETE /api/submissions?file=` | board cookie | Owner removes one submission. |
+| `GET /api/pipeline` | pipe or board cookie | Part 1 only: submitter, session, names, scores. |
 | `GET /api/health` | open | Liveness and a submission count. |
 
-`POST /api/submissions` is deliberately open so anyone who can reach the page
-can submit. That means **whoever can reach the site can submit under any name** —
-fine on an internal network, not fine on the open internet. Put it behind the
-VPN, or in front of your SSO proxy, and let that establish identity.
+Cookie scopes are enforced server-side: a tracker sign-in can never read the
+board's six-question commentary.
 
-Reading submissions always requires the passphrase, server-side.
+`POST /api/submissions` is deliberately open so the form is frictionless;
+whoever can reach the site can submit under any name. Fine behind a VPN or SSO
+proxy; on the open internet it is a trade-off made knowingly.
 
 ## Deploying
 
-It is one file with no dependencies, so most options work:
-
-- **Internal VM or box** — simplest. Run it behind the VPN with a reverse proxy
-  terminating HTTPS.
-- **Azure App Service (Node)** — deploy the folder, set the environment
-  variables, and set `DATA_DIR` to persistent storage, not the default
-  filesystem. Restrict access with Easy Auth against Entra ID and you get real
-  identity for free.
-- **Anywhere else Node runs** — nothing special required.
-
-Whatever you pick, terminate HTTPS in front of it. The cookie is marked `Secure`
-automatically when it sees `X-Forwarded-Proto: https`.
-
-## Without a collector
-
-The form **requires** the collector: submitting never touches the submitter's
-computer, so if the board is unreachable the page says plainly that nothing was
-recorded and offers a retry — the draft stays safe in the browser. There is no
-file fallback by design.
-
-The board is more forgiving offline: it verifies the passphrase locally and can
-still load submissions by file drop, paste, or session archive — useful for
-re-reading an old session's archive folder.
+Currently on Render (auto-deploys from `main`, persistent disk at `/var/data`,
+HTTPS terminated by Render — see `render.yaml`). Anything that runs Node works;
+set `DATA_DIR` to storage that survives deploys.
 
 ## Notes
 
-- The Dragoneer logo is embedded in both pages as a data URI, so they work with
-  no external requests and render offline.
-- Data-viz colours are the house chart palette (`#AF4739` red, `#226296` navy),
-  validated for colour-blind separation and contrast in both light and dark mode.
-- Both pages follow the viewer's light/dark preference.
+- The Dragoneer logo is embedded in all three pages as a data URI — no external
+  requests.
+- All pages are deliberately light-only after a half-applied dark theme broke
+  the form on dark-mode phones.
+- Chart colours are the house palette (`#AF4739` red, `#226296` navy),
+  validated for colour-blind separation and contrast.

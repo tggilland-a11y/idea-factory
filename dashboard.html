@@ -339,11 +339,14 @@
         <h2>Who has submitted</h2>
       </div>
       <div class="tools">
+        <label class="eyebrow" for="sessionPick">Session</label>
+        <select id="sessionPick" style="width:auto"></select>
         <button class="btn" type="button" id="syncBtn">Refresh</button>
       </div>
     </div>
-    <p class="lede">Everything below arrives on its own when someone presses Submit on the form. Refresh
-      pulls anything new since this page was opened.</p>
+    <p class="lede">Everything below arrives on its own when someone presses Submit on the form, and shows
+      one month at a time &mdash; switch sessions above. This board carries Part 2 (the six-question
+      companies); Part 1 lives on the pipeline tracker at <b>/pipeline</b>.</p>
     <div class="livebox">
       <span class="arcstat" id="syncStat"></span>
     </div>
@@ -527,7 +530,38 @@
   var STORE_KEY = "dgnr.if.board.v1";
 
   var $ = function (id) { return document.getElementById(id); };
-  var files = [];              // {id, filename, submitter, session, submittedAt, ideas[]}
+  var files = [];              // every submission, all months
+  var selectedSession = null;  // which month the board is showing
+  var wantedSession = (function () {
+    try { return new URLSearchParams(location.search).get("session") || ""; } catch (e) { return ""; }
+  })();
+
+  function sessions() {
+    // newest month first, ordered by each session's latest submission
+    var latest = {};
+    files.forEach(function (f) {
+      if (!f.session || !f.ideas.length) return;
+      if (!latest[f.session] || f.submittedAt > latest[f.session]) latest[f.session] = f.submittedAt;
+    });
+    return Object.keys(latest).sort(function (a, b) { return latest[b].localeCompare(latest[a]); });
+  }
+
+  function ensureSession() {
+    var all = sessions();
+    if (!all.length) { selectedSession = null; return; }
+    if (wantedSession) {
+      for (var i = 0; i < all.length; i++) {
+        if (slug(all[i]) === wantedSession || all[i] === wantedSession) {
+          selectedSession = all[i]; wantedSession = ""; break;
+        }
+      }
+    }
+    if (!selectedSession || all.indexOf(selectedSession) < 0) selectedSession = all[0];
+  }
+
+  function active() {
+    return files.filter(function (f) { return f.session === selectedSession && f.ideas.length; });
+  }
   var cutoff = 7;
   var scatterMode = "company"; // company | submission
   var rankBy = "excitement";
@@ -615,6 +649,10 @@
     $("reloadBtn").addEventListener("click", reloadFromFolder);
     restoreFolder();
     $("syncBtn").addEventListener("click", function () { syncFromServer({}); });
+    $("sessionPick").addEventListener("change", function () {
+      selectedSession = this.value;
+      render();
+    });
     $("agendaCsvBtn").addEventListener("click", function () {
       if (!files.length) { $("loadErr").textContent = "Nothing to export yet."; return; }
       saveFile("idea-factory_" + slug(sessionName()) + "_discussion-agenda.csv", agendaCsv(), function () {});
@@ -671,6 +709,10 @@
           var loaded = 0, bad = 0;
           var fresh = [];
           list.forEach(function (rec) {
+            // someone who answered only part 1 belongs on the pipeline
+            // tracker, not here — skip quietly, it is not an error
+            if (rec && (!Array.isArray(rec.ideas) || !rec.ideas.length) &&
+                Array.isArray(rec.pipeline) && rec.pipeline.length) return;
             var v = validate(rec, "collector");
             if (v.error) { bad++; return; }
             fresh.push(v.rec); loaded++;
@@ -686,6 +728,24 @@
         if (!quiet) setSync("No collector reachable \u2014 load files or paste rows below.", "warn");
         else setSync("Not connected to a collector.", "");
       })["finally"](function () { syncing = false; });
+  }
+
+  function renderSessionPick() {
+    var sel = $("sessionPick");
+    var all = sessions();
+    sel.textContent = "";
+    all.forEach(function (s) {
+      var o = document.createElement("option");
+      o.value = s; o.textContent = s;
+      sel.appendChild(o);
+    });
+    sel.value = selectedSession || "";
+    sel.disabled = all.length < 2;
+    try {
+      var u = new URL(location.href);
+      if (selectedSession) u.searchParams.set("session", slug(selectedSession));
+      history.replaceState(null, "", u);
+    } catch (e) {}
   }
 
   function setSync(msg, tone) {
@@ -883,7 +943,7 @@
 
   function peopleOf() {
     var seen = {}, out = [];
-    files.forEach(function (f) {
+    active().forEach(function (f) {
       var k = f.submitter.toLowerCase();
       if (!seen[k]) { seen[k] = true; out.push(f.submitter); }
     });
@@ -896,7 +956,7 @@
       schema: "dragoneer.idea-factory.session/v1",
       session: sessionName(),
       exportedAt: new Date().toISOString(),
-      submissions: files.map(function (f) {
+      submissions: active().map(function (f) {
         return { submitter: f.submitter, session: f.session, submittedAt: f.submittedAt, ideas: f.ideas };
       })
     };
@@ -947,11 +1007,7 @@
   function slug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "session"; }
 
   function sessionName() {
-    var names = {};
-    files.forEach(function (f) { if (f.session) names[f.session] = (names[f.session] || 0) + 1; });
-    var best = "", n = 0;
-    Object.keys(names).forEach(function (k) { if (names[k] > n) { n = names[k]; best = k; } });
-    return best || "Current session";
+    return selectedSession || "Current session";
   }
 
   /* ================= aggregate ================= */
@@ -967,7 +1023,7 @@
 
   function aggregate() {
     var map = {}, order = [];
-    files.forEach(function (f) {
+    active().forEach(function (f) {
       f.ideas.forEach(function (idea) {
         var k = norm(idea.company);
         if (!k) return;
@@ -1013,6 +1069,7 @@
 
   /* ================= render ================= */
   function render() {
+    ensureSession();
     renderFiles();
     var has = files.length > 0;
     $("results").hidden = !has;
@@ -1020,8 +1077,10 @@
     $("exportBtn").disabled = !has;
     if (!has) { $("sessionLine").textContent = "No submissions loaded yet"; return; }
 
+    ensureSession();
+    renderSessionPick();
     var cs = ranked();
-    var totalIdeas = files.reduce(function (n, f) { return n + f.ideas.length; }, 0);
+    var totalIdeas = active().reduce(function (n, f) { return n + f.ideas.length; }, 0);
     $("sessionLine").textContent = sessionName() + " · " + peopleOf().length +
       (peopleOf().length === 1 ? " person" : " people") + " · " + totalIdeas +
       " ideas · " + cs.length + " unique names";
@@ -1047,7 +1106,7 @@
   function renderFiles() {
     var ul = $("fileList");
     ul.textContent = "";
-    files.forEach(function (f, i) {
+    active().forEach(function (f, i) {
       var li = document.createElement("li");
       var who = document.createElement("span");
       who.className = "who"; who.textContent = f.submitter;
@@ -1564,7 +1623,7 @@
   /* ---------------- all submissions, flat ---------------- */
   function allRowsData() {
     var rows = [];
-    files.forEach(function (f) {
+    active().forEach(function (f) {
       f.ideas.forEach(function (i) {
         rows.push({
           person: f.submitter,
@@ -1693,7 +1752,7 @@
 
   function buildSlides() {
     var cs = ranked();
-    var totalIdeas = files.reduce(function (n, f) { return n + f.ideas.length; }, 0);
+    var totalIdeas = active().reduce(function (n, f) { return n + f.ideas.length; }, 0);
     var shared = cs.filter(function (c) { return c.mentions > 1; });
     var act = cs.filter(function (c) { return c.avgE >= cutoff && c.avgA >= cutoff; });
     var conv = cs.filter(function (c) { return c.avgE >= cutoff && c.avgA < cutoff; });

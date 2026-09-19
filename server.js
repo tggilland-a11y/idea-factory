@@ -39,6 +39,12 @@ const PASS_ITERS = Number(process.env.PASS_ITERS || 250000);
 const PASS_VERIFIER = process.env.PASS_VERIFIER ||
   "05e7146ff3fa774f0d473e2d38d8ab05c660e48b2ceff69774c07accc5dc88f4";
 
+// The pipeline tracker is shared beyond the team, so it has its own viewer
+// passphrase. It unlocks ONLY the part-1 data (names + excitement), never the
+// board's commentary. The board passphrase opens the tracker too.
+const PIPE_VERIFIER = process.env.PIPE_VERIFIER ||
+  "07c82362af7e155b285e970043e4652cf5455fd2f548b7e3616ae1ca89de77df";
+
 // Cookie signing key. Set SESSION_SECRET in production so sessions survive a
 // restart; otherwise a random key means everyone signs in again after a deploy.
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
@@ -88,15 +94,19 @@ function readBody(req) {
 function sign(value) {
   return crypto.createHmac("sha256", SESSION_SECRET).update(value).digest("hex");
 }
-function issueToken() {
+// Tokens carry a scope: "board" can read everything; "pipe" can read only the
+// part-1 pipeline data. The scope is inside the HMAC, so it cannot be edited.
+function issueToken(scope) {
   const exp = String(Date.now() + SESSION_HOURS * 3600 * 1000);
-  return exp + "." + sign(exp);
+  return scope + "." + exp + "." + sign(scope + "." + exp);
 }
-function tokenValid(token) {
-  if (!token || token.indexOf(".") < 0) return false;
-  const [exp, mac] = token.split(".");
+function tokenValid(token, scopes) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) return false;
+  const [scope, exp, mac] = parts;
+  if (scopes.indexOf(scope) < 0) return false;
   if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
-  const expected = Buffer.from(sign(exp));
+  const expected = Buffer.from(sign(scope + "." + exp));
   const given = Buffer.from(String(mac));
   return expected.length === given.length && crypto.timingSafeEqual(expected, given);
 }
@@ -108,12 +118,12 @@ function cookieOf(req, name) {
   }
   return "";
 }
-function checkPass(pass) {
+function checkPass(pass, verifier) {
   return new Promise((resolve) => {
     crypto.pbkdf2(String(pass || ""), PASS_SALT, PASS_ITERS, 32, "sha256", (err, key) => {
       if (err) return resolve(false);
       const a = Buffer.from(key.toString("hex"));
-      const b = Buffer.from(PASS_VERIFIER);
+      const b = Buffer.from(verifier);
       resolve(a.length === b.length && crypto.timingSafeEqual(a, b));
     });
   });
@@ -124,22 +134,38 @@ function validateSubmission(raw) {
   if (!raw || typeof raw !== "object") return { error: "Not a submission." };
   const submitter = str(raw.submitter, 80);
   if (submitter.length < 2) return { error: "A submitter name is required." };
-  if (!Array.isArray(raw.ideas) || !raw.ideas.length) return { error: "No ideas were included." };
 
-  const ideas = [];
-  for (const i of raw.ideas.slice(0, MAX_IDEAS)) {
-    const company = str(i && i.company, 120);
-    if (!company) continue;
-    ideas.push({
-      company,
-      excitement: clampScore(i.excitement),
-      actionability: clampScore(i.actionability),
-      why: str(i.why, 4000),
-      notes: str(i.notes, 4000),
-      nextSteps: str(i.nextSteps, 4000)
-    });
+  // Part 1: pipeline names, excitement only. Shared beyond the team.
+  const pipeline = [];
+  if (Array.isArray(raw.pipeline)) {
+    for (const p of raw.pipeline.slice(0, 10)) {
+      const company = str(p && p.company, 120);
+      const excitement = clampScore(p && p.excitement);
+      if (!company || excitement == null) continue;
+      pipeline.push({ company, excitement });
+    }
   }
-  if (!ideas.length) return { error: "No ideas had a company name." };
+
+  // Part 2: the six-question ideas. Team-only.
+  const ideas = [];
+  if (Array.isArray(raw.ideas)) {
+    for (const i of raw.ideas.slice(0, MAX_IDEAS)) {
+      const company = str(i && i.company, 120);
+      if (!company) continue;
+      ideas.push({
+        company,
+        excitement: clampScore(i.excitement),
+        actionability: clampScore(i.actionability),
+        why: str(i.why, 4000),
+        notes: str(i.notes, 4000),
+        nextSteps: str(i.nextSteps, 4000)
+      });
+    }
+  }
+
+  if (!pipeline.length && !ideas.length) {
+    return { error: "No companies were included." };
+  }
 
   return {
     rec: {
@@ -147,6 +173,7 @@ function validateSubmission(raw) {
       submitter,
       session: str(raw.session, 60) || "Current session",
       submittedAt: new Date().toISOString(),
+      pipeline,
       ideas
     }
   };
@@ -253,29 +280,49 @@ const server = http.createServer(async (req, res) => {
       return json(res, 201, { ok: true, file, ideas: v.rec.ideas.length, submittedAt: v.rec.submittedAt });
     }
 
-    if (req.method === "POST" && p === "/api/auth") {
+    if (req.method === "POST" && (p === "/api/auth" || p === "/api/pipe-auth")) {
       let pass = "";
       try { pass = (JSON.parse(await readBody(req)) || {}).passphrase; } catch (e) {}
-      if (!(await checkPass(pass))) {
+      const asBoard = await checkPass(pass, PASS_VERIFIER);
+      // the board passphrase opens the pipeline tracker too; never the reverse
+      const asPipe = p === "/api/pipe-auth" && (asBoard || await checkPass(pass, PIPE_VERIFIER));
+      const ok = p === "/api/auth" ? asBoard : asPipe;
+      if (!ok) {
         await new Promise((r) => setTimeout(r, 400));   // blunt the guessing rate
         return json(res, 401, { error: "That passphrase does not match." });
       }
+      const scope = p === "/api/auth" ? "board" : "pipe";
+      const cookieName = scope === "board" ? "dgnr_board" : "dgnr_pipe";
       const secure = (req.headers["x-forwarded-proto"] || "").includes("https") ? " Secure;" : "";
       res.setHeader("set-cookie",
-        "dgnr_board=" + issueToken() + "; Path=/; HttpOnly; SameSite=Lax;" + secure +
+        cookieName + "=" + issueToken(scope) + "; Path=/; HttpOnly; SameSite=Lax;" + secure +
         " Max-Age=" + SESSION_HOURS * 3600);
       return json(res, 200, { ok: true });
     }
 
+    if (req.method === "GET" && p === "/api/pipeline") {
+      const allowed = tokenValid(cookieOf(req, "dgnr_board"), ["board"]) ||
+                      tokenValid(cookieOf(req, "dgnr_pipe"), ["pipe"]);
+      if (!allowed) return json(res, 401, { error: "Sign in to the tracker first." });
+      // Part 1 only — the six-question commentary never leaves the board scope.
+      const out = readAll()
+        .filter((r) => Array.isArray(r.pipeline) && r.pipeline.length)
+        .map((r) => ({
+          submitter: r.submitter, session: r.session,
+          submittedAt: r.submittedAt, pipeline: r.pipeline
+        }));
+      return json(res, 200, { schema: "dragoneer.idea-factory.pipeline/v1", submissions: out });
+    }
+
     if (req.method === "GET" && p === "/api/submissions") {
-      if (!tokenValid(cookieOf(req, "dgnr_board"))) {
+      if (!tokenValid(cookieOf(req, "dgnr_board"), ["board"])) {
         return json(res, 401, { error: "Sign in to the board first." });
       }
       return json(res, 200, { schema: "dragoneer.idea-factory.session/v1", submissions: readAll() });
     }
 
     if (req.method === "DELETE" && p === "/api/submissions") {
-      if (!tokenValid(cookieOf(req, "dgnr_board"))) {
+      if (!tokenValid(cookieOf(req, "dgnr_board"), ["board"])) {
         return json(res, 401, { error: "Sign in to the board first." });
       }
       const name = url.searchParams.get("file") || "";
@@ -294,6 +341,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "GET" && (p === "/board" || p === "/dashboard")) {
       return sendPage(res, "dashboard.html", "Idea Factory — Session Board");
+    }
+    if (req.method === "GET" && (p === "/pipeline" || p === "/tracker")) {
+      return sendPage(res, "pipeline.html", "Idea Factory — Pipeline Tracker");
     }
 
     json(res, 404, { error: "Not found." });
