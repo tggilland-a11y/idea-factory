@@ -37,13 +37,13 @@ const SUB_DIR = path.join(DATA_DIR, "submissions");
 const PASS_SALT = process.env.PASS_SALT || "dgnr-idea-factory-2026";
 const PASS_ITERS = Number(process.env.PASS_ITERS || 250000);
 const PASS_VERIFIER = process.env.PASS_VERIFIER ||
-  "05e7146ff3fa774f0d473e2d38d8ab05c660e48b2ceff69774c07accc5dc88f4";
+  "b1685629788f521e49c84b4b6817e9606e889568f7f6ef1adc26cc2c2ff523f9";
 
 // The pipeline tracker is shared beyond the team, so it has its own viewer
 // passphrase. It unlocks ONLY the part-1 data (names + excitement), never the
 // board's commentary. The board passphrase opens the tracker too.
 const PIPE_VERIFIER = process.env.PIPE_VERIFIER ||
-  "07c82362af7e155b285e970043e4652cf5455fd2f548b7e3616ae1ca89de77df";
+  "5ee30a066319ebb7827fbbae9e2007eea81ca23431a94243438ef2af427fd9a7";
 
 // Cookie signing key. Set SESSION_SECRET in production so sessions survive a
 // restart; otherwise a random key means everyone signs in again after a deploy.
