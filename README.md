@@ -23,7 +23,7 @@ appear on the board under their own session.
 |---|---|---|
 | `/` | The form. First name + last initial, then Part 1 and Part 2. Submitting files everything directly — nothing is saved to the submitter's computer. Submissions are append-only: no editing after submit, but submitting again adds more. | Anyone with the link |
 | `/board` | Session board for Part 2: agenda ranked by total excitement, conviction/actionability map, per-person views, present mode. One month at a time — a session picker (and `?session=september-2026` links) switches months. | Team (board passphrase) |
-| `/pipeline` | Pipeline tracker for Part 1: this month's ranking by total excitement points and a month-over-month matrix with deltas. Shows names, points, and vote counts — never individual attributions or Part 2 commentary. | Broad (tracker passphrase; the board passphrase works too) |
+| `/pipeline` | Pipeline tracker for Part 1: this month's ranking by total excitement points with who submitted each name, a by-person table, and a month-over-month matrix with deltas. Each person counts once per company per month (their latest score). Never shows Part 2 commentary. | Broad (tracker passphrase; the board passphrase works too) |
 
 ## Run it
 

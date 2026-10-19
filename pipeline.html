@@ -113,7 +113,10 @@
   /* ranked bars */
   .bars { display: flex; flex-direction: column; gap: 2px; }
   .bar-row { display: grid; grid-template-columns: minmax(110px, 230px) 1fr auto; gap: 12px; align-items: center; }
-  .bar-row .nm { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-row { padding: 4px 0; }
+  .bar-row .nm { display: flex; flex-direction: column; min-width: 0; }
+  .bar-row .co { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-row .whos { font-size: 11.5px; color: var(--ink-3); line-height: 1.35; }
   .bar-track { height: 22px; background: var(--sunk); position: relative; }
   .bar-fill { height: 100%; background: var(--brand-red); border-radius: 0 4px 4px 0; }
   .bar-row .val { font-size: 13px; font-variant-numeric: tabular-nums; min-width: 9ch; text-align: right; white-space: nowrap; }
@@ -207,6 +210,16 @@
   <section class="block">
     <div class="block-head">
       <div>
+        <div class="eyebrow">Who submitted what</div>
+        <h2 id="peopleHead">By person</h2>
+      </div>
+    </div>
+    <div class="card tblwrap" id="people"></div>
+  </section>
+
+  <section class="block">
+    <div class="block-head">
+      <div>
         <div class="eyebrow">Over time</div>
         <h2>How conviction is moving</h2>
       </div>
@@ -219,8 +232,8 @@
   <div class="loaderr" id="loadErr" role="alert"></div>
 
   <p class="footnote">This page carries Part 1 of the monthly Idea Factory: the private opportunities the
-    team is most excited about, with a 1&ndash;10 excitement score from each person who listed them.
-    Individual attributions and the deeper six-question write-ups stay on the team&rsquo;s session board.</p>
+    team is most excited about, with each person&rsquo;s 1&ndash;10 excitement score and who submitted it.
+    The deeper six-question write-ups stay on the team&rsquo;s session board.</p>
   <p class="srcline">Source: Dragoneer private team Idea Factory, monthly submissions.</p>
 </main>
 
@@ -315,9 +328,21 @@
         if (!k) return;
         if (!map[k]) { map[k] = { key: k, names: {}, byMonth: {} }; order.push(k); }
         map[k].names[p.company] = (map[k].names[p.company] || 0) + 1;
-        var m = map[k].byMonth[r.session] || (map[k].byMonth[r.session] = { points: 0, votes: 0 });
-        m.points += p.excitement;
-        m.votes += 1;
+        var m = map[k].byMonth[r.session] || (map[k].byMonth[r.session] = { people: {} });
+        var pk = r.submitter.toLowerCase();
+        var prev = m.people[pk];
+        if (!prev || r.submittedAt >= prev.at) {
+          m.people[pk] = { name: r.submitter, score: p.excitement, at: r.submittedAt };
+        }
+      });
+    });
+    order.forEach(function (k) {
+      Object.keys(map[k].byMonth).forEach(function (s) {
+        var m = map[k].byMonth[s];
+        m.who = Object.keys(m.people).map(function (pk) { return m.people[pk]; })
+          .sort(function (a, b) { return b.score - a.score || a.name.localeCompare(b.name); });
+        m.points = m.who.reduce(function (n, w) { return n + w.score; }, 0);
+        m.votes = m.who.length;
       });
     });
     return order.map(function (k) {
@@ -331,12 +356,16 @@
     });
   }
 
+  function whoText(who) {
+    return who.map(function (w) { return w.name + " " + w.score; }).join(" · ");
+  }
+
   /* ================= render ================= */
   function render() {
     var ms = months();
     if (!ms.length) {
       $("sessionLine").textContent = "No submissions yet";
-      ["tiles", "ranking", "matrix"].forEach(function (id) {
+      ["tiles", "ranking", "people", "matrix"].forEach(function (id) {
         var h = $(id); h.textContent = "";
         var p = document.createElement("p");
         p.className = "empty";
@@ -395,7 +424,11 @@
     rank.forEach(function (c) {
       var m = c.byMonth[latest];
       var row = document.createElement("div"); row.className = "bar-row";
-      var nm = document.createElement("div"); nm.className = "nm"; nm.textContent = c.name; nm.title = c.name;
+      var nm = document.createElement("div"); nm.className = "nm";
+      var co = document.createElement("span"); co.className = "co"; co.textContent = c.name; co.title = c.name;
+      var ws = document.createElement("span"); ws.className = "whos";
+      ws.textContent = whoText(m.who);
+      nm.appendChild(co); nm.appendChild(ws);
       var tr = document.createElement("div"); tr.className = "bar-track";
       var fl = document.createElement("div"); fl.className = "bar-fill";
       fl.style.width = Math.max(2, (m.points / max) * 100) + "%";
@@ -409,6 +442,38 @@
       bars.appendChild(row);
     });
     rbox.appendChild(bars);
+
+    /* by person — latest month */
+    $("peopleHead").textContent = "By person — " + latest;
+    var byP = {};
+    latestCs.forEach(function (c) {
+      c.byMonth[latest].who.forEach(function (w) {
+        var pk = w.name.toLowerCase();
+        (byP[pk] = byP[pk] || { name: w.name, items: [] }).items.push({ co: c.name, score: w.score });
+      });
+    });
+    var pbox = $("people");
+    pbox.textContent = "";
+    var ptbl = document.createElement("table");
+    var pth = document.createElement("thead");
+    pth.innerHTML = "<tr><th>Person</th><th class=\"n\">Names</th><th>What they submitted (excitement)</th></tr>";
+    ptbl.appendChild(pth);
+    var ptb = document.createElement("tbody");
+    Object.keys(byP).map(function (k) { return byP[k]; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name); })
+      .forEach(function (p) {
+        p.items.sort(function (a, b) { return b.score - a.score || a.co.localeCompare(b.co); });
+        var tr = document.createElement("tr");
+        var a1 = document.createElement("td"); var st = document.createElement("strong");
+        st.textContent = p.name; a1.appendChild(st); tr.appendChild(a1);
+        var a2 = document.createElement("td"); a2.className = "n"; a2.textContent = p.items.length; tr.appendChild(a2);
+        var a3 = document.createElement("td");
+        a3.textContent = p.items.map(function (i) { return i.co + " " + i.score; }).join(" · ");
+        tr.appendChild(a3);
+        ptb.appendChild(tr);
+      });
+    ptbl.appendChild(ptb);
+    pbox.appendChild(ptbl);
 
     /* matrix — every name, every month */
     var mbox = $("matrix");
@@ -446,6 +511,7 @@
           td.textContent = "—"; td.classList.add("dim");
         } else {
           td.textContent = cur.points;
+          td.title = m + ": " + whoText(cur.who);
           var prevMonth = mi > 0 ? shown[mi - 1] : null;
           var prev = prevMonth ? c.byMonth[prevMonth] : null;
           if (prev) {
@@ -482,11 +548,13 @@
       return /[",\r\n]/.test(v) ? "\"" + v.replace(/"/g, "\"\"") + "\"" : v;
     };
     var lines = [["Company"].concat(ms.map(function (m) { return m + " points"; }),
-                                    ms.map(function (m) { return m + " votes"; })).map(esc).join(",")];
+                                    ms.map(function (m) { return m + " votes"; }),
+                                    ms.map(function (m) { return m + " submitted by"; })).map(esc).join(",")];
     cs.forEach(function (c) {
       lines.push([c.name]
         .concat(ms.map(function (m) { return c.byMonth[m] ? c.byMonth[m].points : ""; }))
         .concat(ms.map(function (m) { return c.byMonth[m] ? c.byMonth[m].votes : ""; }))
+        .concat(ms.map(function (m) { return c.byMonth[m] ? whoText(c.byMonth[m].who) : ""; }))
         .map(esc).join(","));
     });
     var text = "﻿" + lines.join("\r\n");
