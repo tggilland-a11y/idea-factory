@@ -45,6 +45,13 @@ const PASS_VERIFIER = process.env.PASS_VERIFIER ||
 const PIPE_VERIFIER = process.env.PIPE_VERIFIER ||
   "5ee30a066319ebb7827fbbae9e2007eea81ca23431a94243438ef2af427fd9a7";
 
+// Months that ran as one meeting. Submissions keep their original label on
+// disk; the label is merged when read, so both dashboards show one entry.
+const SESSION_ALIASES = {
+  "September 2026": "September\u2013October 2026",
+  "October 2026": "September\u2013October 2026"
+};
+
 // Cookie signing key. Set SESSION_SECRET in production so sessions survive a
 // restart; otherwise a random key means everyone signs in again after a deploy.
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
@@ -201,6 +208,7 @@ function readAll() {
     if (!n.endsWith(".json")) continue;
     try {
       const rec = JSON.parse(fs.readFileSync(path.join(SUB_DIR, n), "utf8"));
+      if (rec && SESSION_ALIASES[rec.session]) rec.session = SESSION_ALIASES[rec.session];
       if (rec && rec.submitter && Array.isArray(rec.ideas)) {
         rec.file = n;   // lets the board name a record when the owner removes it
         out.push(rec);
@@ -230,7 +238,7 @@ const SKELETON = (body, title) => `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
-<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}</style>
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}</style>
 </head>
 <body>
 ${body}

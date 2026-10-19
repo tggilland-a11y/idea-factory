@@ -42,6 +42,18 @@
     --f-mono:    Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
   }
   * { box-sizing: border-box; }
+  /* The pages give containers like the passphrase card an explicit display,
+     which would otherwise beat the browser's own [hidden] rule. */
+  [hidden] { display: none !important; }
+  /* ---------- the question respondents saw ---------- */
+  .asked { margin: 28px 0 0; background: var(--panel); border-left: 3px solid var(--accent); padding: 18px 24px 20px; }
+  .asked + .asked { margin-top: 2px; }
+  .asked .askq { font-size: 19px; font-weight: 700; letter-spacing: -0.012em; line-height: 1.32; margin: 8px 0 0; color: var(--ink); text-wrap: balance; max-width: 72ch; }
+  .asked ul { margin: 10px 0 0; padding: 0; list-style: none; }
+  .asked li { position: relative; padding-left: 16px; font-size: 14px; color: var(--ink-2); margin-bottom: 4px; }
+  .asked li::before { content: "\2013"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+  .asked .asksix { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--ink-3); }
+
   body {
     margin: 0; background: var(--paper); color: var(--ink);
     font-family: var(--f-body); font-size: 15.5px; line-height: 1.55;
@@ -330,6 +342,8 @@
       <button class="btn" type="button" id="presentBtn">Present</button>
     </div>
   </header>
+
+  <div id="askedWrap" hidden></div>
 
   <!-- intake -->
   <section class="block" id="intake">
@@ -639,6 +653,7 @@
   function unlock() {
     $("gate").hidden = true;
     $("app").hidden = false;
+    window.scrollTo(0, 0);
     boot();
   }
   var autoUnlock = false;
@@ -742,6 +757,56 @@
         if (!quiet) setSync("No collector reachable \u2014 load files or paste rows below.", "warn");
         else setSync("Not connected to a collector.", "");
       })["finally"](function () { syncing = false; });
+  }
+
+  /* The wording respondents saw, verbatim from the form at the time. */
+  var ASKED = {
+    aug: {
+      eyebrow: "The question we asked \u00b7 August 2026",
+      q: "What investment ideas are you most excited about over the next 12 months?",
+      notes: [
+        "Not just your own work \u2014 include things others are thinking about or working on that you are excited about.",
+        "Submit 3 to 10 ideas. Same six questions for each company.",
+        "Rough numbers are fine \u2014 the scores start the conversation, they do not settle it."
+      ]
+    },
+    q2: {
+      eyebrow: "The question we asked \u00b7 question 2 of 2 on the monthly form",
+      q: "What are the (up to 5) companies you are most excited about that are not a big time bet today?",
+      notes: [
+        "Same six questions as last month for each one.",
+        "Rough numbers are fine \u2014 the scores start the conversation, they do not settle it."
+      ]
+    }
+  };
+  var SIX = ["Company name?", "Excitement level if a deal came about?",
+    "Actionability? (1 = not actionable at all \u00b7 10 = live deal right now)",
+    "Why you are excited?", "Anything else to note?", "Proposed next steps?"];
+
+  function renderAsked() {
+    var wrap = $("askedWrap");
+    wrap.textContent = "";
+    if (!selectedSlugs || !selectedSlugs.length) { wrap.hidden = true; return; }
+    var keys = [];
+    selectedSlugs.forEach(function (w) {
+      var k = w === "august-2026" ? "aug" : "q2";
+      if (keys.indexOf(k) < 0) keys.push(k);
+    });
+    keys.forEach(function (k) {
+      var a = ASKED[k];
+      var box = document.createElement("section");
+      box.className = "asked";
+      var e = document.createElement("div"); e.className = "eyebrow"; e.textContent = a.eyebrow;
+      var q = document.createElement("p"); q.className = "askq"; q.textContent = a.q;
+      var ul = document.createElement("ul");
+      a.notes.forEach(function (n) { var li = document.createElement("li"); li.textContent = n; ul.appendChild(li); });
+      var six = document.createElement("p"); six.className = "asksix";
+      six.textContent = "Asked for each company: " +
+        SIX.map(function (s, i) { return (i + 1) + ". " + s; }).join("   ");
+      box.appendChild(e); box.appendChild(q); box.appendChild(ul); box.appendChild(six);
+      wrap.appendChild(box);
+    });
+    wrap.hidden = false;
   }
 
   function renderSessionPick() {
@@ -1102,6 +1167,7 @@
   /* ================= render ================= */
   function render() {
     ensureSession();
+    renderAsked();
     renderFiles();
     var has = files.length > 0;
     $("results").hidden = !has;

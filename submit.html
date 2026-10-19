@@ -32,6 +32,9 @@
     --f: Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
   }
   * { box-sizing: border-box; }
+  /* The pages give containers like the passphrase card an explicit display,
+     which would otherwise beat the browser's own [hidden] rule. */
+  [hidden] { display: none !important; }
   body {
     margin: 0; background: var(--plane); color: var(--ink);
     font-family: var(--f); font-size: 15.5px; line-height: 1.55;
@@ -504,13 +507,8 @@
     $("whoName").textContent = name;
     save();
     tally();
-    // Land the reader on the two questions, not the masthead — otherwise the
-    // form looks like it ended and people miss that it continues below.
-    var q = document.querySelector(".prompt");
-    if (q) {
-      var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      q.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
-    }
+    // The form is its own page once a name is in: start at the top of it.
+    window.scrollTo(0, 0);
   }
 
   $("startForm").addEventListener("submit", function (e) {
@@ -573,7 +571,10 @@
     var d = new Date();
     var mo = ["January", "February", "March", "April", "May", "June",
               "July", "August", "September", "October", "November", "December"];
-    return mo[d.getMonth()] + " " + d.getFullYear();
+    var s = mo[d.getMonth()] + " " + d.getFullYear();
+    // September and October 2026 ran as one meeting
+    if (s === "September 2026" || s === "October 2026") s = "September\u2013October 2026";
+    return s;
   }
   function blankIdea() {
     return { company: "", excitement: null, actionability: null, why: "", notes: "", nextSteps: "" };
@@ -594,7 +595,9 @@
     } catch (err) {}
     if (!state.pipeline.length) { for (var i = 0; i < 5; i++) state.pipeline.push(blankPipe()); }
     if (!state.ideas.length) state.ideas.push(blankIdea());
-    if (!state.session) state.session = defaultSession();
+    if (!state.session || state.session === "September 2026" || state.session === "October 2026") {
+      state.session = defaultSession();
+    }
 
     $("whoName").textContent = state.submitter || "";
     $("month").value = state.session;
