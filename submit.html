@@ -104,7 +104,9 @@
   a { color: var(--brand-blue); }
 
   /* ---------- start: who is submitting ---------- */
-  .start { min-height: 84vh; display: grid; place-items: center; padding: 30px 24px; }
+  /* Top-aligned on purpose: a vertically centred card made the page look
+     finished, so people missed that the questions continue below. */
+  .start { display: grid; justify-items: center; padding: 44px 24px 70px; }
   .start-card { width: 100%; max-width: 460px; background: var(--surface); border: 1px solid var(--rule); box-shadow: var(--shadow); }
   .start-in { padding: 32px 32px 34px; }
   .start-card h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 9px 0 8px; }
@@ -501,6 +503,13 @@
     $("whoName").textContent = name;
     save();
     tally();
+    // Land the reader on the two questions, not the masthead — otherwise the
+    // form looks like it ended and people miss that it continues below.
+    var q = document.querySelector(".prompt");
+    if (q) {
+      var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      q.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    }
   }
 
   $("startForm").addEventListener("submit", function (e) {

@@ -531,9 +531,12 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var files = [];              // every submission, all months
-  var selectedSession = null;  // which month the board is showing
-  var wantedSession = (function () {
-    try { return new URLSearchParams(location.search).get("session") || ""; } catch (e) { return ""; }
+  var selectedSlugs = null;    // which month(s) the board is showing, as session slugs
+  var wantedSlugs = (function () {
+    try {
+      var v = new URLSearchParams(location.search).get("session") || "";
+      return v.split(",").map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
+    } catch (e) { return []; }
   })();
 
   function sessions() {
@@ -546,21 +549,32 @@
     return Object.keys(latest).sort(function (a, b) { return latest[b].localeCompare(latest[a]); });
   }
 
+  function hasData(w, all) {
+    return all.some(function (s) { return slug(s) === w; });
+  }
+
   function ensureSession() {
     var all = sessions();
-    if (!all.length) { selectedSession = null; return; }
-    if (wantedSession) {
-      for (var i = 0; i < all.length; i++) {
-        if (slug(all[i]) === wantedSession || all[i] === wantedSession) {
-          selectedSession = all[i]; wantedSession = ""; break;
-        }
-      }
+    if (wantedSlugs.length) {
+      if (!all.length) return;            // data not loaded yet: keep the request
+      if (wantedSlugs.some(function (w) { return hasData(w, all); })) selectedSlugs = wantedSlugs.slice();
+      wantedSlugs = [];
     }
-    if (!selectedSession || all.indexOf(selectedSession) < 0) selectedSession = all[0];
+    if (!all.length) { selectedSlugs = null; return; }
+    if (!selectedSlugs || !selectedSlugs.some(function (w) { return hasData(w, all); })) {
+      selectedSlugs = [slug(all[0])];
+    }
   }
 
   function active() {
-    return files.filter(function (f) { return f.session === selectedSession && f.ideas.length; });
+    if (!selectedSlugs) return [];
+    return files.filter(function (f) {
+      return f.ideas.length && selectedSlugs.indexOf(slug(f.session)) >= 0;
+    });
+  }
+
+  function deslug(w) {
+    return w.split("-").map(function (p) { return p.charAt(0).toUpperCase() + p.slice(1); }).join(" ");
   }
   var cutoff = 7;
   var scatterMode = "company"; // company | submission
@@ -650,7 +664,7 @@
     restoreFolder();
     $("syncBtn").addEventListener("click", function () { syncFromServer({}); });
     $("sessionPick").addEventListener("change", function () {
-      selectedSession = this.value;
+      selectedSlugs = this.value.split(",").filter(Boolean);
       render();
     });
     $("agendaCsvBtn").addEventListener("click", function () {
@@ -734,17 +748,23 @@
     var sel = $("sessionPick");
     var all = sessions();
     sel.textContent = "";
+    var cur = selectedSlugs ? selectedSlugs.join(",") : "";
+    if (selectedSlugs && selectedSlugs.length > 1) {
+      var oc = document.createElement("option");
+      oc.value = cur; oc.textContent = sessionName();
+      sel.appendChild(oc);
+    }
     all.forEach(function (s) {
       var o = document.createElement("option");
-      o.value = s; o.textContent = s;
+      o.value = slug(s); o.textContent = s;
       sel.appendChild(o);
     });
-    sel.value = selectedSession || "";
-    sel.disabled = all.length < 2;
+    sel.value = cur;
+    sel.disabled = sel.options.length < 2;
     try {
       var u = new URL(location.href);
-      if (selectedSession) u.searchParams.set("session", slug(selectedSession));
-      history.replaceState(null, "", u);
+      if (cur) u.searchParams.set("session", cur);
+      history.replaceState(null, "", u.toString().replace(/%2C/gi, ","));
     } catch (e) {}
   }
 
@@ -1007,7 +1027,19 @@
   function slug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "session"; }
 
   function sessionName() {
-    return selectedSession || "Current session";
+    if (!selectedSlugs || !selectedSlugs.length) return "Current session";
+    var all = sessions();
+    var names = selectedSlugs.map(function (w) {
+      for (var i = 0; i < all.length; i++) if (slug(all[i]) === w) return all[i];
+      return deslug(w);
+    });
+    if (names.length === 1) return names[0];
+    // "September 2026" + "October 2026" -> "September + October 2026"
+    var years = names.map(function (n) { var m = n.match(/\s(\d{4})$/); return m ? m[1] : ""; });
+    if (years[0] && years.every(function (y) { return y === years[0]; })) {
+      return names.map(function (n) { return n.replace(/\s\d{4}$/, ""); }).join(" + ") + " " + years[0];
+    }
+    return names.join(" + ");
   }
 
   /* ================= aggregate ================= */
@@ -1083,7 +1115,7 @@
     var totalIdeas = active().reduce(function (n, f) { return n + f.ideas.length; }, 0);
     $("sessionLine").textContent = sessionName() + " · " + peopleOf().length +
       (peopleOf().length === 1 ? " person" : " people") + " · " + totalIdeas +
-      " ideas · " + cs.length + " unique names";
+      (totalIdeas === 1 ? " idea · " : " ideas · ") + cs.length + (cs.length === 1 ? " unique name" : " unique names");
 
     renderTiles(cs, totalIdeas);
     renderAgenda();
