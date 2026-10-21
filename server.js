@@ -37,13 +37,13 @@ const SUB_DIR = path.join(DATA_DIR, "submissions");
 const PASS_SALT = process.env.PASS_SALT || "dgnr-idea-factory-2026";
 const PASS_ITERS = Number(process.env.PASS_ITERS || 250000);
 const PASS_VERIFIER = process.env.PASS_VERIFIER ||
-  "b1685629788f521e49c84b4b6817e9606e889568f7f6ef1adc26cc2c2ff523f9";
+  "8aa29b96d5477cd0c01bd8195cd90f1f4bff234462e0577d623978bc6faa0b59";
 
 // The pipeline tracker is shared beyond the team, so it has its own viewer
 // passphrase. It unlocks ONLY the part-1 data (names + excitement), never the
 // board's commentary. The board passphrase opens the tracker too.
 const PIPE_VERIFIER = process.env.PIPE_VERIFIER ||
-  "5ee30a066319ebb7827fbbae9e2007eea81ca23431a94243438ef2af427fd9a7";
+  "8aa29b96d5477cd0c01bd8195cd90f1f4bff234462e0577d623978bc6faa0b59";
 
 // Months that ran as one meeting. Submissions keep their original label on
 // disk; the label is merged when read, so both dashboards show one entry.
@@ -98,8 +98,11 @@ function readBody(req) {
 }
 
 /* ---------------- sessions ---------------- */
+// The current verifiers are part of every signature, so changing either
+// passphrase invalidates every existing sign-in.
 function sign(value) {
-  return crypto.createHmac("sha256", SESSION_SECRET).update(value).digest("hex");
+  return crypto.createHmac("sha256", SESSION_SECRET)
+    .update(value + "|" + PASS_VERIFIER + "|" + PIPE_VERIFIER).digest("hex");
 }
 // Tokens carry a scope: "board" can read everything; "pipe" can read only the
 // part-1 pipeline data. The scope is inside the HMAC, so it cannot be edited.
